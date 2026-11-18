@@ -23,7 +23,7 @@ from starlette.staticfiles import StaticFiles
 
 from . import core, db
 
-VERSION = "0.4.3"
+VERSION = "0.4.4"
 
 
 class Settings:

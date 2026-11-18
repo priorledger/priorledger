@@ -41,7 +41,8 @@ SNIPPET = """## Precedent
 Before a decision that is hard to undo (deleting or migrating data, changing firewalls or DNS,
 force-pushing, handling secrets or money, sending anything in my name), call search_precedent
 on the Prior Ledger MCP server. If an entry fits, follow it or say why not, and cite its url.
-If none fits and you settle the question, tell me, so it can be proposed."""
+If none fits, or one fits but misses something that mattered here, tell me what, so it can be
+proposed."""
 
 
 def read(ledger: Path) -> list[dict]:
