@@ -26,6 +26,7 @@ def main(ledger_dir: str) -> int:
         print(f"no ledger files found in {ledger_dir}")
         return 1
     prev_id = None
+    seen = set()
     count = 0
     for path in files:
         for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
@@ -43,6 +44,13 @@ def main(ledger_dir: str) -> int:
             if entry["provenance"] not in PROVENANCE:
                 print(f"FAIL {where}: unknown provenance {entry['provenance']!r}")
                 return 1
+            if entry["actor"].get("type") == "agent":
+                if "sig" not in entry or "key" not in entry["actor"]:
+                    print(f"FAIL {where}: agent entries must be signed (actor.key and sig)")
+                    return 1
+                if entry["provenance"] == "stated":
+                    print(f"FAIL {where}: an agent entry cannot have provenance 'stated'")
+                    return 1
             expect = canonical_id(entry)
             if entry["id"] != expect:
                 print(f"FAIL {where}: id mismatch\n  stored   {entry['id']}\n  computed {expect}")
@@ -50,6 +58,11 @@ def main(ledger_dir: str) -> int:
             if entry["prev"] != prev_id:
                 print(f"FAIL {where}: chain break\n  stored prev   {entry['prev']}\n  expected prev {prev_id}")
                 return 1
+            for ref in entry["basis"] + ([entry["supersedes"]] if "supersedes" in entry else []):
+                if ref not in seen:
+                    print(f"FAIL {where}: refers to {ref[:12]}..., which is not an earlier entry")
+                    return 1
+            seen.add(entry["id"])
             prev_id = entry["id"]
             count += 1
     print(f"OK: {count} entries verified, chain intact, head {prev_id}")

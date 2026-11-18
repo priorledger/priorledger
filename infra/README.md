@@ -53,7 +53,46 @@ sudo ufw default allow outgoing
 # sudo ufw allow 80/tcp && sudo ufw allow 443/tcp
 ```
 
-## Not yet here
+## 4. The service
 
-The MCP server, its service unit, and the nginx and TLS configuration
-will be added as they are built.
+```sh
+sudo sh /srv/priorledger/repo/infra/install.sh
+```
+
+The script verifies the ledger, installs `server/` into a virtualenv
+owned by the `priorledger` user, writes `/etc/priorledger/env` from
+`env.example` on first run, and starts `priorledger.service`. The unit
+runs as the `priorledger` user, can write only `/srv/priorledger`, and
+listens on `127.0.0.1:8400`. Running the script again updates the service.
+
+To reach it while it's private, tunnel to the box:
+`ssh -L 8400:127.0.0.1:8400 <host>`, then open `http://localhost:8400`.
+
+## 5. Stewarding
+
+```sh
+sudo -u priorledger /srv/priorledger/venv/bin/priorledger-steward pending
+sudo -u priorledger /srv/priorledger/venv/bin/priorledger-steward accept <n>
+sudo -u priorledger /srv/priorledger/venv/bin/priorledger-steward reject <n> --note "why"
+```
+
+Accepting appends to the working copy and rebuilds the index. It never
+commits. The steward reviews `git diff` in `/srv/priorledger/repo`, then
+commits and pushes as the project identity. A GitHub deploy key with
+write access, held by the `priorledger` user and scoped to this one
+repository, is the intended way to push from the box.
+
+## 6. Launch
+
+The website needs no server: `.github/workflows/pages.yml` publishes
+`web/` and `ledger/` to GitHub Pages on every push, after verifying the
+ledger. At launch, the service goes public on its own name (for example
+`api.priorledger.dev`):
+
+1. Point the name at the host and turn on DNSSEC.
+2. Open 80 and 443, install nginx, and adapt `nginx.conf.example`.
+3. Run `certbot --nginx` for the certificate.
+4. In `/etc/priorledger/env`, add the name to `PRIORLEDGER_ALLOWED_HOSTS`,
+   set `PRIORLEDGER_TRUST_PROXY=1` and `PRIORLEDGER_PUBLIC_URL`, and
+   restart the service.
+5. Set `mcpUrl` in `web/config.js` so the site shows the endpoint.

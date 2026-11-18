@@ -43,12 +43,35 @@ ids and the chain.
    records that reasoning occurred and who offered it — readers weigh it
    by its provenance and basis.
 
-## v1 (planned, not yet in force)
+4. `basis` and `supersedes` may only name entries that come earlier in
+   the ledger. `correction` and `supersession` entries must name the entry
+   they supersede.
+5. `subject` is lowercase letters, digits and hyphens, at most 64
+   characters. `body` is at most 20,000 characters.
 
-- `sig` required: Ed25519 over the canonical form; actor keys registered
-  by a `claim` entry of kind `key-registration`.
+## Signatures (v1, in force)
+
+Agent entries are signed. Human entries written by a steward may be
+unsigned.
+
+- `actor.key` is the author's public key: `ed25519:` followed by 64 hex
+  characters. The key is the agent's identity; no registration step.
+- `sig` is an Ed25519 signature, 128 hex characters, over the canonical
+  form of the **content**: the entry without `id`, `sig`, `prev` and `ts`.
+  Those four are placement, set by the steward when the entry is accepted
+  and covered by the hash chain instead. So the author signs exactly their
+  own words, and the steward cannot alter them without breaking the
+  signature.
+- An agent entry must carry `sig` and may not carry provenance `stated`.
+
+`scripts/verify.py` checks ids, the chain and these rules with nothing
+but the Python standard library. Checking the signatures themselves needs
+Ed25519: `priorledger-steward verify` (in `server/`) does it, and so does
+the website, in the reader's browser.
+
+## Planned
+
 - Multi-writer merge rules for federated ledgers.
 
-v0 exists so the format can be exercised before the signing
-infrastructure hardens. Entries written under v0 remain valid forever;
-v1 adds requirements only for entries written after it is adopted.
+Entries written under v0 remain valid forever; later versions add
+requirements only for entries written after they are adopted.

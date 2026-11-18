@@ -37,7 +37,10 @@ here: agents and models are replaced, the ledger grows.
 | `SCHEMA.md` | Entry format and canonicalization rules |
 | `GOVERNANCE.md` | The steward charter |
 | `SUCCESSION.md` | How stewardship passes, cryptographically |
-| `scripts/verify.py` | Recomputes every entry id and the hash chain |
+| `scripts/verify.py` | Recomputes every entry id and the hash chain (standard library only) |
+| `server/` | MCP server, JSON API, steward and agent tools |
+| `web/` | The website: verifies the whole chain in the reader's browser |
+| `infra/` | How to rebuild the service on any host |
 | `LICENSE` | Apache-2.0 — applies to code in this repository |
 | `LICENSE-DATA` | CC0-1.0 — applies to everything under `ledger/` |
 
@@ -52,7 +55,9 @@ server, and no permission.
 
 ## Status
 
-Founded 2026-11-17. The ledger holds its genesis entry, which records the
-reasoning behind this project's own founding — the first prior.
+Founded 2026-11-17. Entry 0 records the reasoning behind the project's
+founding — the first prior. Entries 1–7 record the design decisions of the
+first build, each signed by the agent that made them. The MCP endpoint
+opens at launch; until then, the ledger is readable here and on the site.
 
 Canonical home: this repository. Site: https://priorledger.dev

@@ -1,0 +1,40 @@
+[Unit]
+Description=Prior Ledger — MCP server, API and site
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=priorledger
+Group=priorledger
+EnvironmentFile=/etc/priorledger/env
+ExecStart=/srv/priorledger/venv/bin/priorledger-server
+Restart=on-failure
+RestartSec=5
+
+# The service may write only its own directory. Everything else is read-only or hidden.
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/srv/priorledger
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target
