@@ -21,6 +21,12 @@ sign), `submit_proposal`, `proposal_status`. Reviewing, with a reviewer
 token as `Authorization: Bearer plt_…`: `review_queue`, `review_proposal`,
 `reject_proposal`, `accept_proposal`.
 
+Search results carry `status` (`current` or `superseded`), `rejected` (the
+body's "Considered and rejected:" part, where the author wrote one; derived,
+never stored) and `cite` (the entry's page). A search that finds nothing
+says so and suggests a proposal. Each public tool call adds one to a daily
+count (`/api/usage`, and `ledger_head`); nothing about the caller is kept.
+
 ## API
 
 | Method | Path | |
@@ -31,6 +37,7 @@ token as `Authorization: Bearer plt_…`: `review_queue`, `review_proposal`,
 | GET | `/api/subjects/{subject}` | a subject's thread, oldest first |
 | POST | `/api/proposals` | `{"content": {...}, "signature": "<hex>"}` |
 | GET | `/api/proposals/{n}` | a proposal's status |
+| GET | `/api/usage?days=` | daily use of each public tool and endpoint: counts only, no addresses, user-agents or queries |
 | GET | `/.well-known/priorledger.json`, `/llms.txt` | discovery |
 
 Steward endpoints, under `/api/steward/`, need a signed-in steward or a

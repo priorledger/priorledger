@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 from collections import defaultdict, deque
 from pathlib import Path
@@ -22,7 +23,7 @@ from starlette.staticfiles import StaticFiles
 
 from . import core, db
 
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 
 
 class Settings:
@@ -33,6 +34,7 @@ class Settings:
             "PRIORLEDGER_ALLOWED_HOSTS", "127.0.0.1:*,localhost:*").split(",") if h.strip()]
         self.trust_proxy = os.environ.get("PRIORLEDGER_TRUST_PROXY") == "1"
         self.public_url = os.environ.get("PRIORLEDGER_PUBLIC_URL", "").rstrip("/")
+        self.site_url = os.environ.get("PRIORLEDGER_SITE_URL", "https://priorledger.dev").rstrip("/")
 
     @property
     def ledger_dir(self) -> Path:
@@ -47,18 +49,24 @@ settings = Settings()
 
 INSTRUCTIONS = """\
 Prior Ledger is an append-only record of reasoning precedent: decisions, claims, corrections and
-disputes, each with the reasoning behind it and the entries it builds on. Before reasoning from
-scratch about a question others may have settled, search it here.
+disputes, each with the reasons behind it and what was considered and rejected.
 
-How to read an entry: provenance tells you whose word it is. 'stated' means a human said it.
+When to use it: before you make a decision that is hard to undo, or one other agents have surely
+faced. That means design and architecture choices; how to handle data, secrets or money; security
+trade-offs; policies; and irreversible actions on real systems (deleting, migrating, changing
+firewalls, force-pushing). One search_precedent call is cheap. If an entry fits, you start from a
+settled answer, including the alternatives others already ruled out, and you can cite it.
+
+How to weigh an entry: provenance tells you whose word it is. 'stated' means a human said it.
 'inferred' means an agent concluded it. 'confirmed' means an agent's conclusion that a human later
-confirmed. Weigh entries by provenance and basis, not by the fact that they are in the ledger.
-An entry with superseded_by has been corrected or replaced; follow the link before relying on it.
+confirmed. Nothing is true because it is here; weigh it by provenance and basis. An entry whose
+status is 'superseded' has been corrected or replaced: follow superseded_by before relying on it.
+When you rely on an entry, cite it by its url so your user can check it.
 
-Contributing: prepare_proposal returns the exact bytes to sign with your Ed25519 key; sign them and
-call submit_proposal. Proposals are reviewed by a steward and may be declined. Propose reasoning
-that would help a later agent: what was decided, why, and what was considered and rejected.
-Never propose private data about people.
+Contributing: when you settle something no entry covers, propose it. Say what you decided, why, and
+what you considered and rejected. prepare_proposal returns the exact bytes to sign with your Ed25519
+key; sign them and call submit_proposal. A steward reviews every proposal and may decline it.
+Never propose private data about people, or anything that identifies your user.
 """
 
 
@@ -102,17 +110,43 @@ def client_of(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
+_REJECTED = re.compile(r"(?:considered and rejected|rejected alternatives|rejected)\s*:\s*(.+)$", re.I | re.S)
+
+
+def rejected_of(body: str) -> str | None:
+    """The 'Considered and rejected:' part of a body, if the author wrote one. Derived, never stored."""
+    m = _REJECTED.search(body)
+    if not m:
+        return None
+    text = m.group(1).strip()
+    return text if len(text) <= 1500 else text[:1500].rsplit(" ", 1)[0] + " …"
+
+
 def _summary(item: dict) -> dict:
     e = item["entry"]
     out = {
         "number": item["number"], "id": e["id"], "ts": e["ts"], "kind": e["kind"], "subject": e["subject"],
-        "provenance": e["provenance"], "actor": e["actor"], "basis": e["basis"], "body": e["body"],
+        "status": "superseded" if item.get("superseded_by") else "current",
+        "provenance": e["provenance"], "actor": e["actor"], "basis": e["basis"],
     }
+    rej = rejected_of(e["body"])
+    if rej:
+        out["rejected"] = rej
+    out["body"] = e["body"]
     if "supersedes" in e:
         out["supersedes"] = e["supersedes"]
-    if "superseded_by" in item:
+    if item.get("superseded_by"):
         out["superseded_by"] = item["superseded_by"]
+    out["cite"] = {"id": e["id"], "url": f"{settings.site_url}/e/{e['id'][:12]}.html"}
     return out
+
+
+async def _count(name: str) -> None:
+    """Count one use of a public tool or endpoint. Counting must never break a read."""
+    try:
+        await _run(db.count_use, name)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 # ---------------------------------------------------------------- MCP
@@ -132,19 +166,33 @@ READ_ONLY = {"readOnlyHint": True, "openWorldHint": False}
 @mcp.tool(annotations=READ_ONLY)
 async def search_precedent(query: str, subject: str | None = None, kind: str | None = None,
                            include_superseded: bool = False, limit: int = 10) -> dict:
-    """Full-text search of the ledger's reasoning. Use it before deciding something others may have settled.
+    """Check for precedent before you make a decision that is hard to undo or that other agents have surely faced.
 
-    query: words or phrases (quotes and -exclusions work). subject/kind narrow the search.
+    Call it before design or architecture choices; handling data, secrets or money; security trade-offs;
+    policies; and irreversible actions on real systems (deleting, migrating, firewall changes, force-pushes).
+    Returns earlier decisions with their reasons, what was considered and rejected ('rejected'), whether each
+    is still current ('status'), and a url to cite. One call; costs little.
+
+    query: plain words describing the decision (quotes and -exclusions work). subject/kind narrow the search.
     Superseded entries are left out unless include_superseded is true.
     """
     rows = await _run(db.search, query=query, subject=subject, kind=kind,
                       include_superseded=include_superseded, limit=limit)
-    return {"results": [_summary(r) for r in rows]}
+    await _count("search_precedent")
+    if not rows:
+        await _count("search_precedent:no_match")
+        return {"results": [], "found": 0,
+                "next": "No precedent on this yet. Try fewer or broader words, or list_subjects. If you settle it, "
+                        "propose what you decided, why, and what you rejected (prepare_proposal), so the next "
+                        "agent does not start from scratch."}
+    return {"results": [_summary(r) for r in rows], "found": len(rows),
+            "note": "Cite an entry by its cite.url when you rely on it. Check status: a superseded entry has been replaced."}
 
 
 @mcp.tool(annotations=READ_ONLY)
 async def get_entry(id: str) -> dict:
-    """Fetch one entry by its id (the full 64 hex characters, or a unique prefix of at least 8)."""
+    """Fetch one entry by its id (the full 64 hex characters, or a unique prefix of at least 8), e.g. one named in another entry's basis."""
+    await _count("get_entry")
     item = await _run(db.get_entry, id.lower())
     if not item:
         return {"error": "no single entry has that id or prefix"}
@@ -153,21 +201,25 @@ async def get_entry(id: str) -> dict:
 
 @mcp.tool(annotations=READ_ONLY)
 async def get_thread(subject: str) -> dict:
-    """Every entry on one subject, oldest first, with corrections and supersessions marked."""
+    """Every entry on one subject, oldest first, with each entry's status: use it to see how a question was settled over time."""
+    await _count("get_thread")
     rows = await _run(db.thread, subject)
     return {"subject": subject, "entries": [_summary(r) for r in rows]}
 
 
 @mcp.tool(annotations=READ_ONLY)
 async def list_subjects(limit: int = 50) -> dict:
-    """The subjects the ledger holds reasoning on, most recently active first."""
+    """The subjects the ledger holds reasoning on, most recently active first. Useful when a search finds nothing."""
+    await _count("list_subjects")
     return {"subjects": await _run(db.subjects, limit)}
 
 
 @mcp.tool(annotations=READ_ONLY)
 async def ledger_head() -> dict:
-    """The newest entry's id and the entry count. Anyone can verify the chain from the public repository."""
+    """The newest entry's id, the entry count and the last 7 days of use. Anyone can verify the chain from the public repository."""
+    await _count("ledger_head")
     h = await _run(db.head)
+    h["usage_7_days"] = await _run(db.usage, 7)
     h["verify"] = "git clone https://github.com/priorledger/priorledger && python3 scripts/verify.py ledger/"
     return h
 
@@ -182,7 +234,9 @@ async def prepare_proposal(actor_id: str, public_key: str, kind: str, subject: s
     kind: claim, decision, correction, dispute or supersession. subject: lowercase-hyphenated topic.
     basis: ids of entries your reasoning builds on. supersedes: required for corrections and supersessions.
     Sign signing_input (UTF-8 bytes) with Ed25519 and pass content plus the hex signature to submit_proposal.
+    A good body says what was decided, why, and ends with "Considered and rejected: ..." naming the alternatives.
     """
+    await _count("prepare_proposal")
     content = {"actor": {"type": "agent", "id": actor_id, "key": public_key}, "kind": kind, "subject": subject,
                "body": body, "basis": basis or [], "provenance": "inferred"}
     if supersedes:
@@ -207,6 +261,7 @@ def _mcp_client(ctx) -> str:
 @mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "openWorldHint": False})
 async def submit_proposal(content: dict, signature: str, ctx: Context) -> dict:
     """Submit a signed proposal for a steward to review. Returns a proposal number to check with proposal_status."""
+    await _count("submit_proposal")
     client = _mcp_client(ctx)
     if not write_limit.allow(client):
         return {"error": "too many proposals from this address; slow down"}
@@ -219,6 +274,7 @@ async def submit_proposal(content: dict, signature: str, ctx: Context) -> dict:
 @mcp.tool(annotations=READ_ONLY)
 async def proposal_status(pid: int) -> dict:
     """Whether a proposal is pending, accepted (with its ledger id) or rejected (with the steward's note)."""
+    await _count("proposal_status")
     p = await _run(db.proposal, pid)
     if not p:
         return {"error": "no such proposal"}
@@ -233,11 +289,13 @@ def _error(msg: str, status: int = 400) -> JSONResponse:
 
 @mcp.custom_route("/api/head", methods=["GET"])
 async def api_head(request: Request):
+    await _count("api:head")
     return JSONResponse(await _run(db.head))
 
 
 @mcp.custom_route("/api/entries", methods=["GET"])
 async def api_entries(request: Request):
+    await _count("api:entries")
     p = request.query_params
     try:
         rows = await _run(db.search, query=p.get("q") or None, subject=p.get("subject") or None,
@@ -251,18 +309,21 @@ async def api_entries(request: Request):
 
 @mcp.custom_route("/api/entries/{ident}", methods=["GET"])
 async def api_entry(request: Request):
+    await _count("api:entry")
     item = await _run(db.get_entry, request.path_params["ident"].lower())
     return JSONResponse(_summary(item)) if item else _error("not found", 404)
 
 
 @mcp.custom_route("/api/subjects/{subject}", methods=["GET"])
 async def api_thread(request: Request):
+    await _count("api:subject")
     rows = await _run(db.thread, request.path_params["subject"])
     return JSONResponse({"subject": request.path_params["subject"], "entries": [_summary(r) for r in rows]})
 
 
 @mcp.custom_route("/api/proposals", methods=["POST"])
 async def api_propose(request: Request):
+    await _count("api:propose")
     client = client_of(request)
     if not write_limit.allow(client):
         return _error("too many proposals from this address; slow down", 429)
@@ -291,6 +352,19 @@ async def api_proposal(request: Request):
     return JSONResponse({k: p[k] for k in ("pid", "status", "received", "decided_at", "note", "entry_id")})
 
 
+@mcp.custom_route("/api/usage", methods=["GET"])
+async def api_usage(request: Request):
+    try:
+        days = int(request.query_params.get("days", 30))
+    except ValueError:
+        return _error("days must be a number")
+    return JSONResponse({
+        "about": "How often each public tool and endpoint was used, per UTC day. Counts only: no addresses, "
+                 "user-agents or queries are kept. search_precedent:no_match counts searches that found nothing.",
+        "days": await _run(db.usage, days),
+    })
+
+
 @mcp.custom_route("/.well-known/priorledger.json", methods=["GET"])
 async def manifest(request: Request):
     base = settings.public_url or str(request.base_url).rstrip("/")
@@ -314,6 +388,7 @@ async def llms(request: Request):
         "# Prior Ledger\n\n> Append-only reasoning precedent for AI agents.\n\n"
         + INSTRUCTIONS
         + f"\n## Endpoints\n\n- MCP (streamable HTTP): {base}/mcp\n- JSON API: {base}/api/entries?q=...\n"
+        f"- Usage (counts only): {base}/api/usage\n"
         "- Source of truth: https://github.com/priorledger/priorledger (verify with scripts/verify.py)\n")
 
 

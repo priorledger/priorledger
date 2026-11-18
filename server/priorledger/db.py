@@ -82,6 +82,15 @@ CREATE TABLE IF NOT EXISTS tokens (
     revoked_at  timestamptz
 );
 
+-- How often each public tool is used, per day. Counts only: no address, no user-agent, no query.
+-- Like the queue, this lives here alone; losing it loses history, never any part of the record.
+CREATE TABLE IF NOT EXISTS usage (
+    day   date NOT NULL,
+    name  text NOT NULL,
+    n     bigint NOT NULL DEFAULT 0,
+    PRIMARY KEY (day, name)
+);
+
 CREATE TABLE IF NOT EXISTS audit (
     aid     bigserial PRIMARY KEY,
     at      timestamptz NOT NULL DEFAULT now(),
@@ -194,6 +203,26 @@ def subjects(conn, limit: int = 200) -> list[dict]:
         (max(1, min(int(limit), 1000)),),
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+def count_use(conn, name: str) -> None:
+    """Add one to today's count for a public tool or endpoint. Nothing about the caller is kept."""
+    conn.execute(
+        "INSERT INTO usage (day, name, n) VALUES ((now() AT TIME ZONE 'utc')::date, %s, 1) "
+        "ON CONFLICT (day, name) DO UPDATE SET n = usage.n + 1", (name,))
+    conn.commit()
+
+
+def usage(conn, days: int = 30) -> list[dict]:
+    """Daily counts, newest day first, for the last `days` days (UTC)."""
+    days = max(1, min(int(days), 400))
+    rows = conn.execute(
+        "SELECT day, name, n FROM usage WHERE day > (now() AT TIME ZONE 'utc')::date - %s ORDER BY day DESC, name",
+        (days,)).fetchall()
+    out: dict[str, dict] = {}
+    for r in rows:
+        out.setdefault(r["day"].isoformat(), {})[r["name"]] = r["n"]
+    return [{"day": d, "counts": c} for d, c in out.items()]
 
 
 def known_ids(conn, ids: list[str]) -> set[str]:

@@ -24,9 +24,19 @@ jobs:
           cp -r ledger _site/ledger
       - name: Write plain pages for readers that don't run scripts
         run: python3 scripts/build_static.py ledger/ _site/ --base https://priorledger.dev
+      - name: List the pages that are new since the live site
+        continue-on-error: true
+        run: python3 scripts/indexnow.py plan ledger/ _site/ --base https://priorledger.dev --out indexnow-urls.txt
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
+      - name: Keep that list for after the deploy
+        uses: actions/upload-artifact@v4
+        with:
+          name: indexnow-urls
+          path: indexnow-urls.txt
+          if-no-files-found: ignore
+          retention-days: 1
   deploy:
     needs: build
     runs-on: ubuntu-latest
@@ -36,3 +46,14 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+  announce:
+    needs: deploy
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: indexnow-urls
+      - name: Tell search engines about the new pages (IndexNow)
+        run: python3 scripts/indexnow.py submit indexnow-urls.txt --base https://priorledger.dev --web web

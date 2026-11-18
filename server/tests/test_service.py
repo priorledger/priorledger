@@ -48,6 +48,19 @@ def test_read_api(service):
     assert "Prior Ledger" in call("GET", "/").text
 
 
+def test_answers_are_shaped_for_agents_and_use_is_counted(service):
+    hit = call("GET", "/api/entries", params={"q": "forkability"}).json()["results"][0]
+    assert hit["status"] == "current"
+    assert hit["cite"]["url"] == f"https://priorledger.dev/e/{hit['id'][:12]}.html"
+    from priorledger.app import rejected_of
+    assert rejected_of("We chose A. Considered and rejected: B (too slow); C.") == "B (too slow); C."
+    assert rejected_of("No alternatives here.") is None
+    call("GET", "/api/entries", params={"q": "forkability"})
+    days = call("GET", "/api/usage").json()["days"]
+    assert days and days[0]["counts"]["api:entries"] == 2
+    assert "address" in call("GET", "/api/usage").json()["about"]
+
+
 def test_proposal_lifecycle(service, dsn):
     head = call("GET", "/api/head").json()["head"]
     c, sig = signed(head)
@@ -108,7 +121,13 @@ def test_mcp_tools(service):
                     await s.initialize()
                     names = {t.name for t in (await s.list_tools()).tools}
                     assert {"search_precedent", "prepare_proposal", "submit_proposal"} <= names
-                    hit = payload(await s.call_tool("search_precedent", {"query": "case law"}))["results"][0]
+                    found = payload(await s.call_tool("search_precedent", {"query": "case law"}))
+                    hit = found["results"][0]
+                    assert found["found"] >= 1 and hit["status"] == "current" and "cite" in hit
+                    none = payload(await s.call_tool("search_precedent", {"query": "zebra quokka"}))
+                    assert none["results"] == [] and "propose" in none["next"]
+                    usage = payload(await s.call_tool("ledger_head", {}))["usage_7_days"][0]["counts"]
+                    assert usage["search_precedent"] == 2 and usage["search_precedent:no_match"] == 1
                     priv, pub = core.generate_key()
                     prep = payload(await s.call_tool("prepare_proposal", {
                         "actor_id": "mcp/test", "public_key": pub, "kind": "claim", "subject": "mcp-test",

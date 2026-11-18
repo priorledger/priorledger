@@ -34,3 +34,46 @@ def test_markup_in_a_body_is_escaped(tmp_path):
     out = build_static.Site([e], "https://example.test").entry_page(e)
     assert "<script>alert" not in out and "&lt;script&gt;alert(1)&lt;/script&gt; &amp; more" in out
     assert "<b>me</b>" not in out
+
+
+def test_indexnow_announces_only_what_is_new(tmp_path):
+    """plan: diff the live sitemap with the new build; submit: needs exactly one key file."""
+    import functools
+    import http.server
+    import threading
+
+    script = str(REPO / "scripts" / "indexnow.py")
+    lines = (REPO / "ledger" / "000000.jsonl").read_text().splitlines()
+    old_ledger, new_ledger = tmp_path / "old", tmp_path / "new"
+    for d, rows in ((old_ledger, lines[:-1]), (new_ledger, lines)):
+        d.mkdir()
+        (d / "000000.jsonl").write_text("\n".join(rows) + "\n")
+    live = tmp_path / "live"
+    shutil.copytree(REPO / "web", live)
+    handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=str(live))
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{srv.server_address[1]}"
+    try:
+        build = [sys.executable, str(REPO / "scripts" / "build_static.py")]
+        subprocess.run(build + [str(old_ledger), str(live), "--base", base], check=True, capture_output=True)
+        site = tmp_path / "site"
+        shutil.copytree(REPO / "web", site)
+        subprocess.run(build + [str(new_ledger), str(site), "--base", base], check=True, capture_output=True)
+        out = tmp_path / "urls.txt"
+        subprocess.run([sys.executable, script, "plan", str(new_ledger), str(site), "--base", base, "--out", str(out)],
+                       check=True, capture_output=True)
+        urls = out.read_text().split()
+        import json
+        newest = json.loads(lines[-1])
+        assert f"{base}/e/{newest['id'][:12]}.html" in urls
+        assert f"{base}/d/{newest['ts'][:10]}.html" in urls and f"{base}/" in urls
+        assert not any(f"/e/{json.loads(l)['id'][:12]}.html" in u for l in lines[:-1] for u in urls)
+        # nothing new: nothing announced
+        subprocess.run([sys.executable, script, "plan", str(old_ledger), str(live), "--base", base, "--out", str(out)],
+                       check=True, capture_output=True)
+        assert out.read_text() == ""
+    finally:
+        srv.shutdown()
+    keys = [p.name for p in (REPO / "web").iterdir() if len(p.stem) == 32 and p.suffix == ".txt"]
+    assert len(keys) == 1 and (REPO / "web" / keys[0]).read_text() == keys[0][:-4]
