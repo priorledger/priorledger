@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -160,13 +161,39 @@ def get_entry(conn, ident: str) -> dict | None:
     return _entry_out(rows[0]) if len(rows) == 1 else None
 
 
+def _any_words(conn, query: str) -> str | None:
+    """The query's words, stemmed, joined with OR: for when no entry has all of them."""
+    if '"' in query or re.search(r"(^|\s)-\S|\bor\b", query, re.I):
+        return None  # the searcher used search syntax; respect it exactly
+    words = conn.execute("SELECT tsvector_to_array(to_tsvector('english', %s)) AS w", (query,)).fetchone()["w"]
+    if len(words) < 2:
+        return None
+    return " | ".join("'" + w.replace("'", "''") + "'" for w in words)
+
+
 def search(conn, query: str | None = None, subject: str | None = None, kind: str | None = None,
            provenance: str | None = None, include_superseded: bool = True, limit: int = 20, offset: int = 0) -> list[dict]:
+    """Entries matching every word of the query, best first. If none do, entries matching some
+    of the words, each marked with match = "some words"."""
+    rows = _search(conn, "websearch_to_tsquery('english', %s)", query, subject, kind, provenance,
+                   include_superseded, limit, offset)
+    if rows or not query or offset:
+        return rows
+    loose = _any_words(conn, query)
+    if not loose:
+        return rows
+    rows = _search(conn, "to_tsquery('simple', %s)", loose, subject, kind, provenance, include_superseded, limit, 0)
+    for r in rows:
+        r["match"] = "some words"
+    return rows
+
+
+def _search(conn, tsquery: str, query, subject, kind, provenance, include_superseded, limit, offset) -> list[dict]:
     limit = max(1, min(int(limit), 100))
     offset = max(0, int(offset))
     where, args = [], []
     if query:
-        where.append("tsv @@ websearch_to_tsquery('english', %s)")
+        where.append(f"tsv @@ {tsquery}")
         args.append(query)
     if subject:
         where.append("subject = %s")
@@ -183,7 +210,7 @@ def search(conn, query: str | None = None, subject: str | None = None, kind: str
     if where:
         sql += " WHERE " + " AND ".join(where)
     if query:
-        sql += " ORDER BY ts_rank(tsv, websearch_to_tsquery('english', %s)) DESC, seq DESC"
+        sql += f" ORDER BY ts_rank(tsv, {tsquery}) DESC, seq DESC"
         args.append(query)
     else:
         sql += " ORDER BY seq DESC"

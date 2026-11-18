@@ -23,8 +23,10 @@ token as `Authorization: Bearer plt_…`: `review_queue`, `review_proposal`,
 
 Search results carry `status` (`current` or `superseded`), `rejected` (the
 body's "Considered and rejected:" part, where the author wrote one; derived,
-never stored) and `cite` (the entry's page). A search that finds nothing
-says so and suggests a proposal. Each public tool call adds one to a daily
+never stored) and `cite` (the entry's page). When no entry has every word
+of a query, search returns entries with some of them, best first, each
+marked `"match": "some words"`. A search that finds nothing says so and
+suggests a proposal. Each public tool call adds one to a daily
 count (`/api/usage`, and `ledger_head`); nothing about the caller is kept.
 
 ## API

@@ -56,8 +56,14 @@ def test_answers_are_shaped_for_agents_and_use_is_counted(service):
     assert rejected_of("We chose A. Considered and rejected: B (too slow); C.") == "B (too slow); C."
     assert rejected_of("No alternatives here.") is None
     call("GET", "/api/entries", params={"q": "forkability"})
+    # natural phrasing: no entry has every word, so entries with some of them come back, marked
+    loose = call("GET", "/api/entries", params={"q": "forkability of a zebra stable"}).json()["results"]
+    assert loose and loose[0]["match"] == "some words" and "forkab" in loose[0]["body"].lower()
+    assert "match" not in hit
+    # search syntax is respected exactly: no fallback
+    assert call("GET", "/api/entries", params={"q": '"forkability of a zebra"'}).json()["results"] == []
     days = call("GET", "/api/usage").json()["days"]
-    assert days and days[0]["counts"]["api:entries"] == 2
+    assert days and days[0]["counts"]["api:entries"] == 4
     assert "address" in call("GET", "/api/usage").json()["about"]
 
 
@@ -124,10 +130,13 @@ def test_mcp_tools(service):
                     found = payload(await s.call_tool("search_precedent", {"query": "case law"}))
                     hit = found["results"][0]
                     assert found["found"] >= 1 and hit["status"] == "current" and "cite" in hit
+                    partial = payload(await s.call_tool("search_precedent", {"query": "case law for a quokka"}))
+                    assert partial["results"] and "some of them" in partial["note"]
                     none = payload(await s.call_tool("search_precedent", {"query": "zebra quokka"}))
                     assert none["results"] == [] and "propose" in none["next"]
                     usage = payload(await s.call_tool("ledger_head", {}))["usage_7_days"][0]["counts"]
-                    assert usage["search_precedent"] == 2 and usage["search_precedent:no_match"] == 1
+                    assert usage["search_precedent"] == 3 and usage["search_precedent:no_match"] == 1
+                    assert usage["search_precedent:some_words"] == 1
                     priv, pub = core.generate_key()
                     prep = payload(await s.call_tool("prepare_proposal", {
                         "actor_id": "mcp/test", "public_key": pub, "kind": "claim", "subject": "mcp-test",

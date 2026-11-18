@@ -23,7 +23,7 @@ from starlette.staticfiles import StaticFiles
 
 from . import core, db
 
-VERSION = "0.4.1"
+VERSION = "0.4.2"
 
 
 class Settings:
@@ -133,6 +133,8 @@ def _summary(item: dict) -> dict:
     if rej:
         out["rejected"] = rej
     out["body"] = e["body"]
+    if item.get("match"):
+        out["match"] = item["match"]
     if "supersedes" in e:
         out["supersedes"] = e["supersedes"]
     if item.get("superseded_by"):
@@ -185,8 +187,12 @@ async def search_precedent(query: str, subject: str | None = None, kind: str | N
                 "next": "No precedent on this yet. Try fewer or broader words, or list_subjects. If you settle it, "
                         "propose what you decided, why, and what you rejected (prepare_proposal), so the next "
                         "agent does not start from scratch."}
-    return {"results": [_summary(r) for r in rows], "found": len(rows),
-            "note": "Cite an entry by its cite.url when you rely on it. Check status: a superseded entry has been replaced."}
+    note = "Cite an entry by its cite.url when you rely on it. Check status: a superseded entry has been replaced."
+    if rows[0].get("match") == "some words":
+        await _count("search_precedent:some_words")
+        note = ("No entry matched every word, so these match some of them, best first. Judge whether each "
+                "really covers your decision. " + note)
+    return {"results": [_summary(r) for r in rows], "found": len(rows), "note": note}
 
 
 @mcp.tool(annotations=READ_ONLY)
