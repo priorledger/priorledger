@@ -22,7 +22,7 @@ from starlette.staticfiles import StaticFiles
 
 from . import core, db
 
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 
 
 class Settings:
@@ -359,7 +359,9 @@ def main() -> None:
     print(f"priorledger: index rebuilt, {len(ledger.entries)} entries, head {ledger.head}", flush=True)
     uvicorn.run(create_app(), host=os.environ.get("PRIORLEDGER_HOST", "127.0.0.1"),
                 port=int(os.environ.get("PRIORLEDGER_PORT", "8400")),
-                proxy_headers=settings.trust_proxy, log_level="info")
+                proxy_headers=settings.trust_proxy, log_level="info",
+                # a commons keeps no record of who read what: no per-request log lines
+                access_log=False)
 
 
 if __name__ == "__main__":

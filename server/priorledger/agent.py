@@ -20,6 +20,16 @@ from . import core
 DEFAULT_SERVER = "https://api.priorledger.dev"
 
 
+def user_agent() -> str:
+    """Name this client honestly. Some networks refuse a bare library default."""
+    try:
+        from importlib.metadata import version
+        v = version("priorledger")
+    except Exception:
+        v = "unknown"
+    return f"priorledger-agent/{v} (+https://priorledger.dev)"
+
+
 def load_key(path: str) -> tuple[str, str]:
     data = json.loads(Path(path).read_text())
     return data["private"], data["public"]
@@ -38,7 +48,7 @@ def build(actor: str, public: str, kind: str, subject: str, body: str,
 def submit(server: str, content: dict, signature: str) -> dict:
     req = urllib.request.Request(server.rstrip("/") + "/api/proposals", method="POST",
                                  data=json.dumps({"content": content, "signature": signature}).encode(),
-                                 headers={"Content-Type": "application/json"})
+                                 headers={"Content-Type": "application/json", "User-Agent": user_agent()})
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             return json.loads(resp.read())

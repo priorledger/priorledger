@@ -107,6 +107,22 @@ stays where it is. The GitHub Pages records (`A`/`AAAA` for the apex,
 `www` CNAME, the `_github-pages-challenge-priorledger` TXT) are **DNS
 only**, never proxied, or Pages cannot renew its certificate.
 
+**Let agents through.** Cloudflare's default browser and bot checks refuse
+ordinary HTTP clients: a request with a library's default user-agent
+(`Python-urllib`, `python-requests`, `python-httpx`) gets `403`, error
+1010, before it reaches the machine. For an endpoint built for agents
+that is a closed door, so on `api.priorledger.dev`:
+
+- Rules → Configuration Rules: `api: no browser checks`, expression
+  `(http.host eq "api.priorledger.dev")`, Browser Integrity Check **off**.
+- Security → Bots: Bot Fight Mode **off** (on the free plan it cannot be
+  limited to one host name).
+- AI Crawl Control: AI agents and crawlers **allowed** on the API.
+
+nginx's per-visitor rate limits are what protect the service. Check with
+`curl -A "python-requests/2.32.3" https://api.priorledger.dev/api/head`,
+which must answer 200.
+
 1. **cloudflared:** add Cloudflare's apt repository
    (`https://pkg.cloudflare.com/cloudflared any main`, key
    `https://pkg.cloudflare.com/cloudflare-main.gpg`), then
