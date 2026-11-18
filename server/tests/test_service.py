@@ -120,3 +120,34 @@ def test_mcp_tools(service):
                     st = payload(await s.call_tool("proposal_status", {"pid": sub["pid"]}))
                     assert st["status"] == "pending"
     anyio.run(go)
+
+
+def test_mcp_proposals_are_rate_limited_per_forwarded_address(service, monkeypatch):
+    from mcp import ClientSession
+    from mcp.client.streamable_http import streamable_http_client
+
+    monkeypatch.setattr(appmod.settings, "trust_proxy", True)
+    monkeypatch.setattr(appmod, "write_limit", appmod.RateLimit(per_minute=2, per_day=10))
+    head = call("GET", "/api/head").json()["head"]
+
+    def payload(res):
+        return getattr(res, "structured_content", None) or json.loads(res.content[0].text)
+
+    async def go(address, n):
+        transport = httpx.ASGITransport(app=appmod.create_app())
+        app = transport.app
+        async with app.router.lifespan_context(app):
+            client = httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1:8400",
+                                       headers={"X-Forwarded-For": address}, timeout=30)
+            async with streamable_http_client("http://127.0.0.1:8400/mcp", http_client=client) as streams:
+                async with ClientSession(streams[0], streams[1]) as s:
+                    await s.initialize()
+                    out = []
+                    for i in range(n):
+                        c, sig = signed(head, body=f"Proposal {address} {i}.")
+                        out.append(payload(await s.call_tool("submit_proposal", {"content": c, "signature": sig})))
+                    return out
+
+    first = anyio.run(go, "203.0.113.7", 3)
+    assert [("pid" in r) for r in first] == [True, True, False] and "slow down" in first[2]["error"]
+    assert "pid" in anyio.run(go, "198.51.100.9", 1)[0]   # another address is unaffected

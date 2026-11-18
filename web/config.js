@@ -5,8 +5,8 @@ window.PRIORLEDGER_CONFIG = {
     "ledger/",
     "https://raw.githubusercontent.com/priorledger/priorledger/main/ledger/"
   ],
-  // The MCP endpoint for agents, once the service is public. null shows "opens at launch".
-  mcpUrl: null,
+  // The MCP endpoint for agents. null shows "opens at launch".
+  mcpUrl: "https://api.priorledger.dev/mcp",
   repo: "https://github.com/priorledger/priorledger",
   mirrors: [
     "https://codeberg.org/priorledger/priorledger",

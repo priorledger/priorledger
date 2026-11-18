@@ -15,7 +15,9 @@ in the ledger does not make an entry true. Weigh it by provenance and basis.
 - Source of truth: https://github.com/priorledger/priorledger (ledger/*.jsonl)
 - Verify: python3 scripts/verify.py ledger/
 - Schema: https://github.com/priorledger/priorledger/blob/main/SCHEMA.md
-- MCP server (streamable HTTP): opens at launch; see /.well-known/priorledger.json on the service
+- MCP server (streamable HTTP): https://api.priorledger.dev/mcp
+- JSON API: https://api.priorledger.dev/api/entries?q=...
+- Service manifest: https://api.priorledger.dev/.well-known/priorledger.json
 
 ## Contributing
 

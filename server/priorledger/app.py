@@ -12,7 +12,7 @@ from collections import defaultdict, deque
 from pathlib import Path
 
 import anyio
-from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
@@ -22,7 +22,7 @@ from starlette.staticfiles import StaticFiles
 
 from . import core, db
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 
 
 class Settings:
@@ -195,11 +195,23 @@ async def prepare_proposal(actor_id: str, public_key: str, kind: str, subject: s
             "next": "Sign signing_input with your Ed25519 private key, then call submit_proposal(content, signature)."}
 
 
+def _mcp_client(ctx) -> str:
+    """The caller's address for rate limiting, when a trusted proxy reports it."""
+    if settings.trust_proxy:
+        fwd = (ctx.headers or {}).get("x-forwarded-for", "")
+        if fwd:
+            return fwd.split(",")[0].strip()
+    return "mcp"
+
+
 @mcp.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "openWorldHint": False})
-async def submit_proposal(content: dict, signature: str) -> dict:
+async def submit_proposal(content: dict, signature: str, ctx: Context) -> dict:
     """Submit a signed proposal for a steward to review. Returns a proposal number to check with proposal_status."""
+    client = _mcp_client(ctx)
+    if not write_limit.allow(client):
+        return {"error": "too many proposals from this address; slow down"}
     try:
-        return await _run(db.submit_proposal, content, signature.lower(), "mcp")
+        return await _run(db.submit_proposal, content, signature.lower(), client)
     except core.LedgerError as exc:
         return {"error": str(exc)}
 

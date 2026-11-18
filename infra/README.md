@@ -39,19 +39,20 @@ rebuilt from the repository at any time; it is never the source of truth.
 
 ## 3. Network
 
-Default deny incoming. During development the service is reachable only
-over a private network. Public ports 80 and 443 open only at launch,
-together with a TLS certificate — `.dev` domains are HTTPS-only in every
-major browser, so the site cannot be served without one.
+Default deny incoming. Prior Ledger never needs an inbound port: the
+steward reaches the machine over a private network, and the public
+endpoint arrives through an outbound tunnel (§6).
 
 ```sh
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
 # administrative access over a private network only, e.g.:
 # sudo ufw allow in on tailscale0
-# at launch:
-# sudo ufw allow 80/tcp && sudo ufw allow 443/tcp
 ```
+
+**Before changing any firewall rule, list what is listening:**
+`sudo ss -tlnp`. If the machine is shared, other services may depend on
+ports Prior Ledger does not use. Close nothing you did not open.
 
 ## 4. The service
 
@@ -83,24 +84,71 @@ sudo -u priorledger /srv/priorledger/venv/bin/priorledger-steward reject <n> --n
 Reviewer agents work the queue with a token the steward issues in the
 portal. See `REVIEWING.md` for what to accept and reject.
 
-## 6. Launch
+## 6. Going public
 
 The website needs no server: `.github/workflows/pages.yml` publishes
 `web/` and `ledger/` to GitHub Pages on every push, after verifying the
-ledger. At launch, the service goes public on its own name (for example
-`api.priorledger.dev`):
+ledger. The service goes public on its own name, `api.priorledger.dev`,
+through a Cloudflare Tunnel into nginx, which lets through only an
+allow-list: `/mcp`, the read API, proposal submission and status, and the
+discovery files. Everything else, the steward portal included, gets 404.
+The portal stays reachable only on a private name
+(`PRIORLEDGER_ADMIN_HOSTS`).
 
-1. Point the name at the host. DNSSEC needs a DNS provider that signs
-   zones; enter the DS record it gives you at the registrar.
-2. Open 80 and 443, install nginx, and adapt `nginx.conf.example`.
-3. Run `certbot --nginx` for the certificate.
-4. In `/etc/priorledger/env`, add the name to `PRIORLEDGER_ALLOWED_HOSTS`,
-   set `PRIORLEDGER_TRUST_PROXY=1` and `PRIORLEDGER_PUBLIC_URL`, and
-   restart the service.
-5. Set `mcpUrl` in `web/config.js` so the site shows the endpoint.
-6. Add `https://<name>/admin/auth/callback` to the Google client's
-   redirect URIs and set `PRIORLEDGER_ADMIN_URL`. To keep the portal off
-   the public name, set `PRIORLEDGER_ADMIN_HOSTS` to a private host name.
+Why a tunnel: the machine opens no inbound port, and its address appears
+in no DNS record, so the commons cannot be traced through its host. nginx
+listens on `127.0.0.1:8480` only; cloudflared is its sole client.
+
+The tunnel is the only part tied to one provider. To replace it, point
+any other front at `127.0.0.1:8480`; the allow-list does not change.
+
+The domain's DNS is hosted at Cloudflare (free plan); the registrar
+stays where it is. The GitHub Pages records (`A`/`AAAA` for the apex,
+`www` CNAME, the `_github-pages-challenge-priorledger` TXT) are **DNS
+only**, never proxied, or Pages cannot renew its certificate.
+
+1. **cloudflared:** add Cloudflare's apt repository
+   (`https://pkg.cloudflare.com/cloudflared any main`, key
+   `https://pkg.cloudflare.com/cloudflare-main.gpg`), then
+   `apt-get install cloudflared`.
+2. **Authorize:** `sudo cloudflared tunnel login`; open the link in the
+   project's Cloudflare account and pick `priorledger.dev`. This writes
+   `/root/.cloudflared/cert.pem`.
+3. **Tunnel:** `sudo cloudflared tunnel create priorledger`. Move the
+   credentials file it names into `/etc/cloudflared/` (mode 0600) and
+   write `/etc/cloudflared/config.yml`:
+
+   ```yaml
+   tunnel: <tunnel id>
+   credentials-file: /etc/cloudflared/<tunnel id>.json
+   no-autoupdate: true
+   ingress:
+     - hostname: api.priorledger.dev
+       service: http://127.0.0.1:8480
+     - service: http_status:404
+   ```
+
+   Check it: `sudo cloudflared tunnel --config /etc/cloudflared/config.yml ingress validate`.
+4. **nginx:** copy `infra/nginx/priorledger.conf` to
+   `/etc/nginx/sites-available/priorledger`, link it into `sites-enabled`,
+   `nginx -t`, `systemctl reload nginx`. It adds one listener,
+   `127.0.0.1:8480`, and touches no other site.
+5. **Service:** in `/etc/priorledger/env`, add `api.priorledger.dev` and
+   `api.priorledger.dev:*` to `PRIORLEDGER_ALLOWED_HOSTS`, set
+   `PRIORLEDGER_TRUST_PROXY=1` and
+   `PRIORLEDGER_PUBLIC_URL=https://api.priorledger.dev`, then restart.
+   Until the host name is allowed, `/mcp` answers 421.
+6. **Open it:** `sudo cloudflared tunnel route dns priorledger api.priorledger.dev`,
+   then `sudo cloudflared --config /etc/cloudflared/config.yml service install`.
+   `sudo cloudflared tunnel info priorledger` should list connections.
+7. **Check from outside:** `dig +short api.priorledger.dev` shows only
+   Cloudflare addresses; `/api/head` answers; `/admin` and
+   `/api/steward/tokens` give 404; `/` redirects to the site.
+
+Rate limits apply at both layers. nginx allows per address: MCP 60
+requests a minute, reads 120 a minute, proposals 6 a minute. The service
+adds 6 proposals a minute and 60 a day per address, over HTTP and MCP
+alike, at most 20 pending proposals per key, and 2,000 pending overall.
 
 ## 7. Steward sign-in
 

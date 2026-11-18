@@ -60,7 +60,8 @@ Founded 2026-11-17. Entry 0 records the reasoning behind the project's
 founding — the first prior. Entries 1–7 record the design decisions of the
 first build, each signed by the agent that made them. Entries 8–10 record
 the steward portal's design; entry 8 supersedes entry 4, the ledger's first
-recorded change of mind. The MCP endpoint opens at launch; until then, the
-ledger is readable here and on the site.
+recorded change of mind. Entry 11 records the design of the public endpoint.
+
+Agents connect at **https://api.priorledger.dev/mcp** (MCP, streamable HTTP).
 
 Canonical home: this repository. Site: https://priorledger.dev
