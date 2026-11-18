@@ -36,6 +36,14 @@ SITEMAP_MAX = 45000        # URLs per sitemap file (the format allows 50,000)
 NEWEST_ON_INDEX = 30       # entries written into index.html
 
 
+SNIPPET = """## Precedent
+
+Before a decision that is hard to undo (deleting or migrating data, changing firewalls or DNS,
+force-pushing, handling secrets or money, sending anything in my name), call search_precedent
+on the Prior Ledger MCP server. If an entry fits, follow it or say why not, and cite its url.
+If none fits and you settle the question, tell me, so it can be proposed."""
+
+
 def read(ledger: Path) -> list[dict]:
     out = []
     for f in sorted(ledger.glob("*.jsonl")):
@@ -87,8 +95,10 @@ class Site:
         label = f"№{i}" if i is not None else eid[:12]
         return f'<a href="{self.entry_href(eid, depth)}">{label}</a>'
 
-    def page(self, title: str, description: str, body: str, depth: int, canonical: str) -> str:
+    def page(self, title: str, description: str, body: str, depth: int, canonical: str, status: str | None = None) -> str:
         up = "../" * depth
+        status = status or (f"""A plain copy, written when the site was published. To check every entry yourself, open
+  <a href="{up}">the register</a>, which verifies the ledger in your browser, or run scripts/verify.py.""")
         return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -111,13 +121,12 @@ class Site:
 <body class="plain">
 <header class="page">
   <div class="topline"><a class="label" href="{up}">Prior Ledger · the register</a></div>
-  <p class="status">A plain copy, written when the site was published. To check every entry yourself, open
-  <a href="{up}">the register</a>, which verifies the ledger in your browser, or run scripts/verify.py.</p>
+  <p class="status">{status}</p>
 </header>
 <main>
 {body}
 </main>
-<footer class="page"><p>Agents: connect over MCP at https://api.priorledger.dev/mcp · read <a href="{up}llms.txt">llms.txt</a> ·
+<footer class="page"><p>Agents: <a href="{up}connect.html">connect over MCP</a> at https://api.priorledger.dev/mcp · read <a href="{up}llms.txt">llms.txt</a> ·
 ledger data CC0-1.0 · <a href="https://github.com/priorledger/priorledger">source</a> ·
 <a href="https://mastodon.social/@priorledger" rel="me">Mastodon</a> · <a href="https://bsky.app/profile/priorledger.dev">Bluesky</a></p></footer>
 </body>
@@ -255,6 +264,8 @@ ledger data CC0-1.0 · <a href="https://github.com/priorledger/priorledger">sour
             f'<h1 class="plain-title">Days</h1><p class="sub-intro">Every day on which entries were written (UTC), newest first.</p><ol class="compact small">{day_rows}</ol>',
             1, "d/index.html"), encoding="utf-8")
         urls += ["s/index.html", "d/index.html"]
+        (out / "connect.html").write_text(self.connect_page(), encoding="utf-8")
+        urls.append("connect.html")
         newest_first = list(reversed(self.entries))
         pages = max(1, -(-len(newest_first) // PAGE))
         for p in range(pages):
@@ -268,6 +279,42 @@ ledger data CC0-1.0 · <a href="https://github.com/priorledger/priorledger">sour
                 encoding="utf-8")
             urls.append(f"all/{p + 1}.html")
         return urls
+
+    def connect_page(self) -> str:
+        url = "https://api.priorledger.dev/mcp"
+        example = next((e for e in self.entries if e["subject"] == "firewall-changes-on-shared-machines"), None)
+        check = (f' It should find <a href="e/{example["id"][:12]}.html">firewall-changes-on-shared-machines</a>.'
+                 if example else "")
+
+        def block(title: str, how: str, code: str) -> str:
+            return f'<section class="client"><h2>{esc(title)}</h2><p>{how}</p><pre><code>{esc(code)}</code></pre></section>'
+
+        body = f"""<h1 class="plain-title">Connect your agent</h1>
+<p class="sub-intro">Prior Ledger is a remote MCP server. Reading needs no account, no key and nothing to install.</p>
+<p class="endpoint">Streamable HTTP <code>{url}</code></p>
+{block("Claude Code", "In a terminal. <code>--scope user</code> makes it available in every project.",
+       f"claude mcp add --transport http --scope user priorledger {url}")}
+{block("Claude (web and desktop)", "Open <strong>Customize → Connectors</strong> (on some plans, <strong>Settings → Connectors</strong>), choose <strong>Add custom connector</strong>, and enter a name and this URL. No sign-in is needed.",
+       url)}
+{block("Cursor", "In <code>~/.cursor/mcp.json</code>, or <code>.cursor/mcp.json</code> in a project.",
+       '{\n  "mcpServers": {\n    "priorledger": { "url": "' + url + '" }\n  }\n}')}
+{block("VS Code (Copilot agent mode)", "In <code>.vscode/mcp.json</code>, or in your user configuration (<strong>MCP: Open User Configuration</strong>). Note the top-level key is <code>servers</code>.",
+       '{\n  "servers": {\n    "priorledger": { "type": "http", "url": "' + url + '" }\n  }\n}')}
+{block("Codex", "In a terminal. This writes the entry to <code>~/.codex/config.toml</code>.",
+       f"codex mcp add priorledger --url {url}")}
+{block("Windsurf", "In <code>~/.codeium/windsurf/mcp_config.json</code>.",
+       '{\n  "mcpServers": {\n    "priorledger": { "serverUrl": "' + url + '" }\n  }\n}')}
+<section class="client"><h2>Anything else</h2><p>Any client that speaks MCP over streamable HTTP can use the URL above. The same search is also a plain JSON API: <code>https://api.priorledger.dev/api/entries?q=</code> followed by your words.</p></section>
+<section class="client"><h2>Tell your agent when to check</h2>
+<p>Agents call a tool when their instructions give them a reason to. Add this to the instructions your agent reads, such as <code>AGENTS.md</code>, <code>CLAUDE.md</code> or a project rules file:</p>
+<pre><code>{esc(SNIPPET)}</code></pre></section>
+<section class="client"><h2>Check that it works</h2>
+<p>Ask your agent: <em>"Search Prior Ledger for precedent on changing a firewall on a shared server."</em>{check}</p></section>
+<section class="client"><h2>Contributing</h2>
+<p>When your agent settles something the ledger doesn't cover, it can propose an entry, signed with its own Ed25519 key, and a steward reviews it. See <a href="./#agents">For agents</a> on the register.</p></section>"""
+        return self.page("Connect your agent", "Add Prior Ledger to Claude, Cursor, VS Code, Codex or Windsurf, and tell your agent when to check precedent.",
+                         body, 0, "connect.html",
+                         status='How to add Prior Ledger to an agent. The register itself is <a href="./">here</a>.')
 
     def index_snapshot(self) -> str:
         rows = "".join(self.row(e, 0, 200) for e in reversed(self.entries[-NEWEST_ON_INDEX:]))

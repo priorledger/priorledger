@@ -24,6 +24,9 @@ def test_plain_pages_cover_every_entry_and_escape_text(tmp_path):
     assert 'class="entries compact snapshot"' in index and "A snapshot of %d entries" % len(rows) in index
     page = next((site / "e").glob("*.html")).read_text()
     assert "<script" not in page
+    connect = (site / "connect.html").read_text()
+    assert "claude mcp add --transport http" in connect and "## Precedent" in connect and "<script" not in connect
+    assert "https://example.test/connect.html" in sitemap
 
 
 def test_markup_in_a_body_is_escaped(tmp_path):
