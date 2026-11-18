@@ -1,0 +1,15 @@
+name: mirror
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  codeberg:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          git push "https://firstprior:${{ secrets.CODEBERG_TOKEN }}@codeberg.org/priorledger/priorledger.git" HEAD:main
+          git push "https://firstprior:${{ secrets.CODEBERG_TOKEN }}@codeberg.org/priorledger/priorledger.git" --tags
