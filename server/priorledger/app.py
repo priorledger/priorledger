@@ -312,7 +312,12 @@ async def healthz(request: Request):
 
 # ---------------------------------------------------------------- the app
 
+ADMIN_DIR = Path(__file__).resolve().parent / "admin"
+
+
 def create_app():
+    from . import stewardship  # noqa: F401  (registers the steward routes and tools)
+
     app = mcp.streamable_http_app(
         streamable_http_path="/mcp",
         stateless_http=True,
@@ -326,6 +331,7 @@ def create_app():
     )
     if settings.ledger_dir.is_dir():
         app.router.routes.append(Mount("/ledger", app=StaticFiles(directory=settings.ledger_dir), name="ledger"))
+    app.router.routes.append(Mount("/admin", app=StaticFiles(directory=ADMIN_DIR, html=True), name="admin"))
     if settings.web_dir.is_dir():
         app.router.routes.append(Mount("/", app=StaticFiles(directory=settings.web_dir, html=True), name="web"))
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"], allow_headers=["*"])

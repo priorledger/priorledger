@@ -16,6 +16,7 @@ dependencies = [
     "uvicorn>=0.30",
     "starlette>=0.40",
     "anyio>=4",
+    "httpx>=0.27",
 ]
 
 [project.optional-dependencies]
@@ -28,3 +29,6 @@ priorledger-agent = "priorledger.agent:main"
 
 [tool.setuptools]
 packages = ["priorledger"]
+
+[tool.setuptools.package-data]
+priorledger = ["admin/*"]

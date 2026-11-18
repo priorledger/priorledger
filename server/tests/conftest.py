@@ -28,5 +28,5 @@ def dsn():
     import psycopg
 
     with psycopg.connect(value, autocommit=True) as conn:
-        conn.execute("DROP TABLE IF EXISTS entries, proposals, meta")
+        conn.execute("DROP TABLE IF EXISTS reviews, tokens, audit, entries, proposals, meta CASCADE")
     return value

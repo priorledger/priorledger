@@ -58,6 +58,37 @@ CREATE INDEX IF NOT EXISTS proposals_key ON proposals (actor_key, status);
 CREATE UNIQUE INDEX IF NOT EXISTS proposals_once ON proposals (sig);
 
 CREATE TABLE IF NOT EXISTS meta (k text PRIMARY KEY, v text NOT NULL);
+
+ALTER TABLE proposals ADD COLUMN IF NOT EXISTS decided_by text;
+
+CREATE TABLE IF NOT EXISTS reviews (
+    rid            bigserial PRIMARY KEY,
+    pid            bigint NOT NULL REFERENCES proposals(pid),
+    reviewer       text NOT NULL,
+    recommendation text NOT NULL CHECK (recommendation IN ('accept', 'reject', 'needs-human')),
+    reasoning      text NOT NULL,
+    created        timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS reviews_pid ON reviews (pid);
+
+CREATE TABLE IF NOT EXISTS tokens (
+    tid         bigserial PRIMARY KEY,
+    label       text NOT NULL,
+    token_hash  text UNIQUE NOT NULL,
+    scopes      text[] NOT NULL,
+    created     timestamptz NOT NULL DEFAULT now(),
+    expires     timestamptz NOT NULL,
+    last_used   timestamptz,
+    revoked_at  timestamptz
+);
+
+CREATE TABLE IF NOT EXISTS audit (
+    aid     bigserial PRIMARY KEY,
+    at      timestamptz NOT NULL DEFAULT now(),
+    actor   text NOT NULL,
+    action  text NOT NULL,
+    detail  jsonb NOT NULL DEFAULT '{}'::jsonb
+);
 """
 
 INDEX_LOCK = 7_340_001  # advisory lock key for rebuilds
@@ -215,7 +246,7 @@ def proposal(conn, pid: int) -> dict | None:
     row = conn.execute("SELECT * FROM proposals WHERE pid=%s", (pid,)).fetchone()
     if not row:
         return None
-    out = {k: row[k] for k in ("pid", "status", "note", "entry_id")}
+    out = {k: row[k] for k in ("pid", "status", "note", "entry_id", "decided_by")}
     out["received"] = row["received"].isoformat()
     out["decided_at"] = row["decided_at"].isoformat() if row["decided_at"] else None
     out["content"] = row["content"]
@@ -228,14 +259,86 @@ def pending(conn, limit: int = 50) -> list[dict]:
     return [proposal(conn, r["pid"]) for r in rows]
 
 
-def decide(conn, pid: int, status: str, note: str | None = None, entry_id: str | None = None) -> None:
+def decide(conn, pid: int, status: str, note: str | None = None, entry_id: str | None = None,
+           by: str = "steward") -> None:
     with conn.transaction():
         n = conn.execute(
-            "UPDATE proposals SET status=%s, note=%s, entry_id=%s, decided_at=now() WHERE pid=%s AND status='pending'",
-            (status, note, entry_id, pid),
+            "UPDATE proposals SET status=%s, note=%s, entry_id=%s, decided_by=%s, decided_at=now() "
+            "WHERE pid=%s AND status='pending'",
+            (status, note, entry_id, by, pid),
         ).rowcount
     if n != 1:
         raise core.LedgerError(f"proposal {pid} is not pending")
+
+
+# ---------------------------------------------------------------- reviews, tokens, audit
+
+def proposals_with_reviews(conn, status: str = "pending", limit: int = 100) -> list[dict]:
+    rows = conn.execute("SELECT pid FROM proposals WHERE status=%s ORDER BY pid DESC LIMIT %s",
+                        (status, max(1, min(limit, 500)))).fetchall()
+    out = []
+    for r in rows:
+        p = proposal(conn, r["pid"])
+        p["reviews"] = [
+            {"reviewer": v["reviewer"], "recommendation": v["recommendation"], "reasoning": v["reasoning"],
+             "created": v["created"].isoformat()}
+            for v in conn.execute("SELECT * FROM reviews WHERE pid=%s ORDER BY rid", (r["pid"],)).fetchall()
+        ]
+        out.append(p)
+    return out
+
+
+def add_review(conn, pid: int, reviewer: str, recommendation: str, reasoning: str) -> None:
+    if recommendation not in ("accept", "reject", "needs-human"):
+        raise core.LedgerError("recommendation must be accept, reject or needs-human")
+    if not reasoning or not reasoning.strip() or len(reasoning) > 5000:
+        raise core.LedgerError("reasoning must be 1 to 5000 characters")
+    with conn.transaction():
+        p = conn.execute("SELECT status FROM proposals WHERE pid=%s", (pid,)).fetchone()
+        if not p:
+            raise core.LedgerError("no such proposal")
+        if p["status"] != "pending":
+            raise core.LedgerError(f"proposal {pid} is already {p['status']}")
+        conn.execute("INSERT INTO reviews (pid, reviewer, recommendation, reasoning) VALUES (%s,%s,%s,%s)",
+                     (pid, reviewer, recommendation, reasoning.strip()))
+
+
+def audit(conn, actor: str, action: str, **detail) -> None:
+    with conn.transaction():
+        conn.execute("INSERT INTO audit (actor, action, detail) VALUES (%s,%s,%s)", (actor, action, Jsonb(detail)))
+
+
+def audit_log(conn, limit: int = 200) -> list[dict]:
+    rows = conn.execute("SELECT * FROM audit ORDER BY aid DESC LIMIT %s", (limit,)).fetchall()
+    return [{"at": r["at"].isoformat(), "actor": r["actor"], "action": r["action"], "detail": r["detail"]} for r in rows]
+
+
+def create_token(conn, label: str, token_hash: str, scopes: list[str], days: int) -> dict:
+    with conn.transaction():
+        row = conn.execute(
+            "INSERT INTO tokens (label, token_hash, scopes, expires) VALUES (%s,%s,%s, now() + make_interval(days => %s)) "
+            "RETURNING tid, expires", (label, token_hash, scopes, days)).fetchone()
+    return {"tid": row["tid"], "expires": row["expires"].isoformat()}
+
+
+def token_by_hash(conn, token_hash: str) -> dict | None:
+    with conn.transaction():
+        row = conn.execute(
+            "UPDATE tokens SET last_used=now() WHERE token_hash=%s AND revoked_at IS NULL AND expires > now() "
+            "RETURNING tid, label, scopes", (token_hash,)).fetchone()
+    return dict(row) if row else None
+
+
+def list_tokens(conn) -> list[dict]:
+    rows = conn.execute("SELECT tid, label, scopes, created, expires, last_used, revoked_at FROM tokens "
+                        "ORDER BY tid DESC").fetchall()
+    return [{k: (v.isoformat() if hasattr(v, "isoformat") else v) for k, v in r.items()} for r in rows]
+
+
+def revoke_token(conn, tid: int) -> bool:
+    with conn.transaction():
+        return conn.execute("UPDATE tokens SET revoked_at=now() WHERE tid=%s AND revoked_at IS NULL",
+                            (tid,)).rowcount == 1
 
 
 def dumps(obj) -> str:

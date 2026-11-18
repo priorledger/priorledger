@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Prior Ledger — steward</title>
+<link rel="icon" href="/assets/mark.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/style.css">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<header class="page steward-head">
+  <div class="topline">
+    <span class="label">Prior Ledger · steward</span>
+    <span class="who" id="who"></span>
+  </div>
+  <h1>The steward's desk</h1>
+  <p class="tagline" id="tagline">Proposals in, decisions out. Every decision is public in the history.</p>
+  <p class="flash" id="flash" role="status" aria-live="polite" hidden></p>
+</header>
+
+<main id="signin" class="signin" hidden>
+  <p>Only the ledger's stewards can sign in here. Everyone else can read the whole ledger on the <a href="/">register</a>.</p>
+  <p><a class="button primary" id="signin-link" href="/admin/login">Sign in with Google</a></p>
+  <p class="quiet" id="signin-note"></p>
+</main>
+
+<main id="desk" hidden>
+  <nav class="tabs" aria-label="Steward sections">
+    <button type="button" data-tab="queue" aria-current="page">Queue <span id="queue-count"></span></button>
+    <button type="button" data-tab="decided">Decided</button>
+    <button type="button" data-tab="tokens">Reviewer tokens</button>
+    <button type="button" data-tab="write">Write an entry</button>
+    <button type="button" data-tab="log">Log</button>
+  </nav>
+
+  <section id="tab-queue" class="tab">
+    <ol class="entries" id="queue"></ol>
+    <p class="empty" id="queue-empty" hidden>Nothing waiting. The queue is clear.</p>
+  </section>
+
+  <section id="tab-decided" class="tab" hidden>
+    <div class="field inline">
+      <label for="decided-status">Show</label>
+      <select id="decided-status"><option value="accepted">Accepted</option><option value="rejected">Rejected</option></select>
+    </div>
+    <ol class="entries" id="decided"></ol>
+    <p class="empty" id="decided-empty" hidden>None yet.</p>
+  </section>
+
+  <section id="tab-tokens" class="tab" hidden>
+    <p class="lede">A reviewer token lets an agent work the queue for you. It sees only what its scopes allow, it expires, and every decision it makes is signed into the public history under the token's name. Only a hash of the token is stored here.</p>
+    <form id="token-form" class="form">
+      <div class="field"><label for="token-label">Label</label><input id="token-label" maxlength="60" required placeholder="nightly-reviewer"></div>
+      <fieldset class="field">
+        <legend>Scopes</legend>
+        <label class="check"><input type="checkbox" value="review:read" checked disabled> read the queue</label>
+        <label class="check"><input type="checkbox" name="scope" value="review:annotate" checked> record recommendations</label>
+        <label class="check"><input type="checkbox" name="scope" value="review:reject"> reject proposals</label>
+        <label class="check"><input type="checkbox" name="scope" value="review:accept"> accept proposals <em>(publishes to the ledger)</em></label>
+      </fieldset>
+      <div class="field"><label for="token-days">Expires after</label>
+        <select id="token-days"><option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option></select></div>
+      <p><button type="submit" class="button primary">Issue token</button></p>
+    </form>
+    <div class="reveal" id="token-reveal" hidden>
+      <p><strong>Copy this now.</strong> It won't be shown again.</p>
+      <code id="token-value"></code>
+      <p><button type="button" class="button" id="token-copy">Copy token</button></p>
+    </div>
+    <h2>Issued</h2>
+    <ol class="rows" id="tokens"></ol>
+  </section>
+
+  <section id="tab-write" class="tab" hidden>
+    <p class="lede">A human entry, in your own words. It is published as <em>stated</em>, or as <em>confirmed</em> when you vouch for an agent's conclusion.</p>
+    <form id="write-form" class="form">
+      <div class="row">
+        <div class="field"><label for="w-kind">Kind</label>
+          <select id="w-kind"><option>decision</option><option>claim</option><option>correction</option><option>dispute</option><option>supersession</option><option>succession</option></select></div>
+        <div class="field"><label for="w-prov">Provenance</label>
+          <select id="w-prov"><option value="stated">stated</option><option value="confirmed">confirmed</option></select></div>
+        <div class="field grow"><label for="w-subject">Subject</label><input id="w-subject" required pattern="[a-z0-9][a-z0-9\-]{0,63}" placeholder="lowercase-with-hyphens"></div>
+      </div>
+      <div class="field"><label for="w-basis">Basis (entry ids, separated by spaces)</label><input id="w-basis" spellcheck="false"></div>
+      <div class="field"><label for="w-supersedes">Supersedes (for corrections)</label><input id="w-supersedes" spellcheck="false"></div>
+      <div class="field"><label for="w-body">The reasoning</label><textarea id="w-body" rows="9" required></textarea></div>
+      <p><button type="submit" class="button primary">Publish entry</button></p>
+    </form>
+  </section>
+
+  <section id="tab-log" class="tab" hidden>
+    <ol class="rows" id="log"></ol>
+  </section>
+</main>
+
+<footer class="page"><p><a href="/">The register</a> · <button type="button" class="linklike" id="signout" hidden>Sign out</button></p></footer>
+<script src="admin.js"></script>
+</body>
+</html>

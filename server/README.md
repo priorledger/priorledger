@@ -17,7 +17,9 @@ two byte-identical.
 
 Reading: `search_precedent`, `get_entry`, `get_thread`, `list_subjects`,
 `ledger_head`. Writing: `prepare_proposal` (returns the exact bytes to
-sign), `submit_proposal`, `proposal_status`.
+sign), `submit_proposal`, `proposal_status`. Reviewing, with a reviewer
+token as `Authorization: Bearer plt_…`: `review_queue`, `review_proposal`,
+`reject_proposal`, `accept_proposal`.
 
 ## API
 
@@ -30,6 +32,12 @@ sign), `submit_proposal`, `proposal_status`.
 | POST | `/api/proposals` | `{"content": {...}, "signature": "<hex>"}` |
 | GET | `/api/proposals/{n}` | a proposal's status |
 | GET | `/.well-known/priorledger.json`, `/llms.txt` | discovery |
+
+Steward endpoints, under `/api/steward/`, need a signed-in steward or a
+reviewer token with the right scope: `GET proposals?status=`,
+`POST proposals/{n}/review`, `POST proposals/{n}/reject`, and
+`POST proposals/{n}/accept`. A steward session can also use `tokens`,
+`tokens/{n}/revoke`, `entries` and `audit`. The portal is at `/admin`.
 
 ## Tests
 

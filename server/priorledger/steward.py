@@ -3,9 +3,9 @@
 Run on the server as the ledger's own user, e.g.
     sudo -u priorledger /srv/priorledger/venv/bin/priorledger-steward pending
 
-Accepting appends to the ledger file in the working copy and rebuilds the index.
-It never commits or pushes: the steward reviews `git diff` and commits as the
-project identity. Nothing becomes part of the record until it is pushed.
+Accepting appends to the ledger and rebuilds the index. With PRIORLEDGER_PUBLISH=git
+it also commits and pushes, naming who accepted; otherwise the steward reviews
+`git diff` and commits by hand. Nothing is part of the record until it is pushed.
 """
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ import argparse
 import sys
 import textwrap
 
-from . import core, db
+from . import core, db, publish
 from .app import settings
 
 
@@ -68,36 +68,16 @@ def cmd_show(args) -> int:
 
 def cmd_accept(args) -> int:
     with db.connect(settings.dsn) as conn:
-        p = db.proposal(conn, args.pid)
-        if not p or p["status"] != "pending":
-            print("that proposal is not pending", file=sys.stderr)
-            return 1
-        ledger = core.read_ledger(settings.ledger_dir)
-        known = ledger.by_id()
-        refs = p["content"]["basis"] + ([p["content"]["supersedes"]] if "supersedes" in p["content"] else [])
-        missing = [r for r in refs if r not in known]
-        if missing:
-            print(f"cannot accept: refers to entries not in the ledger: {missing}", file=sys.stderr)
-            return 1
-        entry = core.place(p["content"], p["sig"], ledger.head)
-        core.check_entry_shape(entry)
-        core.verify_signature(entry)
-        path = core.append(settings.ledger_dir, entry)
-        try:
-            core.read_ledger(settings.ledger_dir)
-        except core.LedgerError as exc:  # pragma: no cover - would mean a bug above
-            print(f"ledger failed verification after append; inspect {path}: {exc}", file=sys.stderr)
-            return 2
-        db.decide(conn, args.pid, "accepted", args.note, entry["id"])
-        db.rebuild(conn, settings.ledger_dir)
-    print(f"accepted proposal {args.pid} as entry {entry['id']} in {path.name}")
-    print("review with `git diff`, then commit and push as the project identity")
+        entry = publish.accept(conn, settings.repo, args.pid, "steward", args.note)
+    print(f"accepted proposal {args.pid} as entry {entry['id']}")
+    if publish.mode() != "git":
+        print("review with `git diff`, then commit and push as the project identity")
     return 0
 
 
 def cmd_reject(args) -> int:
     with db.connect(settings.dsn) as conn:
-        db.decide(conn, args.pid, "rejected", args.note)
+        publish.reject(conn, args.pid, "steward", args.note)
     print(f"rejected proposal {args.pid}")
     return 0
 
@@ -109,19 +89,11 @@ def cmd_write(args) -> int:
                "body": body.strip(), "basis": args.basis or [], "provenance": args.provenance}
     if args.supersedes:
         content["supersedes"] = args.supersedes
-    core.check_content(content)
-    ledger = core.read_ledger(settings.ledger_dir)
-    known = ledger.by_id()
-    for ref in content["basis"] + ([args.supersedes] if args.supersedes else []):
-        if ref not in known:
-            print(f"unknown entry {ref}", file=sys.stderr)
-            return 1
-    entry = core.place(content, None, ledger.head)
-    path = core.append(settings.ledger_dir, entry)
-    core.read_ledger(settings.ledger_dir)
     with db.connect(settings.dsn) as conn:
-        db.rebuild(conn, settings.ledger_dir)
-    print(f"wrote entry {entry['id']} to {path.name}; review with `git diff`, then commit and push")
+        entry = publish.write(conn, settings.repo, content, "steward")
+    print(f"wrote entry {entry['id']}")
+    if publish.mode() != "git":
+        print("review with `git diff`, then commit and push as the project identity")
     return 0
 
 
@@ -156,7 +128,7 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     try:
         return args.fn(args)
-    except core.LedgerError as exc:
+    except (core.LedgerError, publish.PublishError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 

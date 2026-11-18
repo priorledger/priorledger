@@ -28,6 +28,11 @@ if [ ! -f /etc/priorledger/env ]; then
   echo "wrote /etc/priorledger/env from the example; review it"
 fi
 
+if grep -q '^PRIORLEDGER_SECRET=$' /etc/priorledger/env; then
+  sed -i "s/^PRIORLEDGER_SECRET=$/PRIORLEDGER_SECRET=$(python3 -c 'import secrets; print(secrets.token_hex(32))')/" /etc/priorledger/env
+  echo "generated the session secret"
+fi
+
 install -m 0644 "$REPO/infra/priorledger.service" /etc/systemd/system/priorledger.service
 systemctl daemon-reload
 systemctl enable --quiet priorledger
