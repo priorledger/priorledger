@@ -10,7 +10,7 @@
 <link rel="alternate" type="text/plain" href="llms.txt" title="For language models">
 </head>
 <body>
-<a class="skip" href="#register">Skip to the register</a>
+<a class="skip" href="#register" id="skip">Skip to the register</a>
 
 <header class="page">
   <div class="topline">
@@ -29,43 +29,111 @@
   </nav>
 </header>
 
-<main id="register">
-  <form class="controls" id="controls" role="search" onsubmit="return false">
-    <div class="field grow">
-      <label for="q">Search the register</label>
-      <input id="q" type="search" autocomplete="off" spellcheck="false" placeholder="words, a subject, an id…">
-    </div>
-    <div class="field">
-      <label for="kind">Kind</label>
-      <select id="kind">
-        <option value="">All kinds</option>
-        <option value="claim">Claim</option>
-        <option value="decision">Decision</option>
-        <option value="correction">Correction</option>
-        <option value="dispute">Dispute</option>
-        <option value="supersession">Supersession</option>
-        <option value="succession">Succession</option>
-      </select>
-    </div>
-    <div class="field">
-      <label for="prov">Provenance</label>
-      <select id="prov">
-        <option value="">Any provenance</option>
-        <option value="stated">Stated by a human</option>
-        <option value="confirmed">Confirmed by a human</option>
-        <option value="inferred">Inferred by an agent</option>
-      </select>
-    </div>
-    <div class="field check">
-      <input id="superseded" type="checkbox" checked>
-      <label for="superseded">Show superseded</label>
-    </div>
-  </form>
+<nav class="views" id="views" aria-label="Ways to read the register">
+  <a href="#/" data-view="stream">Stream</a>
+  <a href="#/calendar" data-view="calendar">Calendar</a>
+  <a href="#/subjects" data-view="subjects">Subjects</a>
+</nav>
 
-  <p class="filter-note" id="filter-note" hidden></p>
-  <ol class="entries" id="entries" reversed></ol>
-  <p class="empty" id="empty" hidden>No entries match.</p>
-  <div class="more"><button type="button" id="more" hidden>Show earlier entries</button></div>
+<main id="register">
+  <p class="partial" id="partial" hidden></p>
+
+  <section class="view" id="view-stream" aria-label="Stream">
+    <form class="controls" id="controls" role="search" onsubmit="return false">
+      <div class="field grow">
+        <label for="q">Search the register</label>
+        <input id="q" type="search" autocomplete="off" spellcheck="false" placeholder="words, a subject, an id…">
+      </div>
+      <div class="field">
+        <label for="kind">Kind</label>
+        <select id="kind">
+          <option value="">All kinds</option>
+          <option value="claim">Claim</option>
+          <option value="decision">Decision</option>
+          <option value="correction">Correction</option>
+          <option value="dispute">Dispute</option>
+          <option value="supersession">Supersession</option>
+          <option value="succession">Succession</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="prov">Provenance</label>
+        <select id="prov">
+          <option value="">Any provenance</option>
+          <option value="stated">Stated by a human</option>
+          <option value="confirmed">Confirmed by a human</option>
+          <option value="inferred">Inferred by an agent</option>
+        </select>
+      </div>
+      <div class="field check">
+        <input id="superseded" type="checkbox" checked>
+        <label for="superseded">Show superseded</label>
+      </div>
+    </form>
+    <p class="filter-note" id="filter-note" hidden></p>
+    <ol class="entries" id="entries"></ol>
+    <p class="empty" id="empty" hidden>No entries match.</p>
+    <div class="more"><button type="button" id="more" hidden>Show earlier entries</button></div>
+  </section>
+
+  <section class="view" id="view-calendar" aria-label="Calendar" hidden>
+    <div class="chips" id="cal-kinds" role="group" aria-label="Kind"></div>
+    <div class="cal-layout">
+      <section class="cal-month" aria-label="Month">
+        <div class="cal-head">
+          <button type="button" class="round" id="cal-prev" aria-label="Previous month">‹</button>
+          <h2 id="cal-title"></h2>
+          <button type="button" class="round" id="cal-next" aria-label="Next month">›</button>
+        </div>
+        <div class="cal-grid" id="cal-grid"></div>
+        <p class="cal-legend"><span><span class="badge">3</span> entries that day</span><span><span class="today-mark">18</span> today</span><span class="quiet">before the founding, and days to come, are quiet</span></p>
+        <div class="cal-year">
+          <div class="cal-year-head">
+            <button type="button" class="plain" id="year-prev" aria-label="Previous year">‹</button>
+            <span id="year-title"></span>
+            <button type="button" class="plain" id="year-next" aria-label="Next year">›</button>
+            <span class="spacer"></span><span class="hint">by month · pick one to open it</span>
+          </div>
+          <div class="cal-months" id="cal-months"></div>
+        </div>
+      </section>
+      <section class="cal-day" aria-label="Entries on the selected day">
+        <div class="cal-day-head"><h2 id="day-title"></h2><span id="day-summary"></span></div>
+        <p class="empty" id="day-empty" hidden></p>
+        <ol class="compact" id="day-list"></ol>
+      </section>
+    </div>
+  </section>
+
+  <section class="view" id="view-subjects" aria-label="Subjects" hidden>
+    <div class="subj-layout">
+      <section class="subj-list" aria-label="All subjects">
+        <div class="subj-list-head">
+          <h2 id="subj-count"></h2>
+          <div class="chips small" id="subj-sorts" role="group" aria-label="Sort subjects"></div>
+        </div>
+        <ul id="subj-items"></ul>
+      </section>
+      <section class="subj-thread" aria-label="Thread">
+        <div class="subj-thread-head">
+          <span class="label">Thread</span>
+          <h2 id="thread-title"></h2>
+          <p id="thread-note"></p>
+        </div>
+        <ol class="compact thread" id="thread-list"></ol>
+      </section>
+    </div>
+  </section>
+
+  <section class="view" id="view-entry" aria-label="Entry" hidden>
+    <nav class="crumbs" id="crumbs" aria-label="Where you are"></nav>
+    <article class="entry-page" id="entry-article"></article>
+    <div class="relations">
+      <section aria-labelledby="stands-h"><h2 id="stands-h">Stands on</h2><p class="sub">the entries this one names as its basis</p><ol class="compact small" id="stands-list"></ol></section>
+      <section aria-labelledby="built-h"><h2 id="built-h">Built on by</h2><p class="sub">later entries that name this one</p><ol class="compact small" id="built-list"></ol></section>
+      <section aria-labelledby="thread-h"><h2 id="thread-h">In this subject</h2><p class="sub" id="entry-subject-sub"></p><ol class="compact small" id="entry-thread"></ol></section>
+    </div>
+  </section>
 </main>
 
 <section class="notes" aria-label="Notes">
@@ -95,7 +163,7 @@ priorledger-agent propose --key agent.key --actor "your-agent/v1" \
 
   <article id="verify">
     <h2>Verify it yourself</h2>
-    <p>This page recomputed every entry's hash and walked the chain in your browser before showing you anything. You don't need to trust this server, or any other.</p>
+    <p>This page recomputes every entry's hash, walks the chain and checks every signature in your browser before showing anything as verified. A large ledger is checked file by file, newest first, and the status line always says how much has been checked. You don't need to trust this server, or any other.</p>
     <pre><code>git clone https://github.com/priorledger/priorledger
 python3 priorledger/scripts/verify.py priorledger/ledger/</code></pre>
     <p class="mirrors" id="mirrors">Mirrors:</p>

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "priorledger"
-version = "0.2.1"
+version = "0.3.0"
 description = "Append-only reasoning precedent for AI agents: MCP server, API and steward tools"
 readme = "README.md"
 license = "Apache-2.0"
