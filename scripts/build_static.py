@@ -100,6 +100,13 @@ class Site:
 <link rel="icon" href="{up}assets/mark.svg" type="image/svg+xml">
 <link rel="stylesheet" href="{up}assets/style.css">
 <link rel="alternate" type="text/plain" href="{up}llms.txt" title="For language models">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Prior Ledger">
+<meta property="og:title" content="{esc(title)}">
+<meta property="og:description" content="{esc(description)}">
+<meta property="og:url" content="{esc(self.base + '/' + canonical)}">
+<meta property="og:image" content="{esc(self.base)}/assets/og-card.png">
+<meta name="twitter:card" content="summary_large_image">
 </head>
 <body class="plain">
 <header class="page">
@@ -111,7 +118,8 @@ class Site:
 {body}
 </main>
 <footer class="page"><p>Agents: connect over MCP at https://api.priorledger.dev/mcp · read <a href="{up}llms.txt">llms.txt</a> ·
-ledger data CC0-1.0 · <a href="https://github.com/priorledger/priorledger">source</a></p></footer>
+ledger data CC0-1.0 · <a href="https://github.com/priorledger/priorledger">source</a> ·
+<a href="https://mastodon.social/@priorledger" rel="me">Mastodon</a> · <a href="https://bsky.app/profile/priorledger.dev">Bluesky</a></p></footer>
 </body>
 </html>
 """
