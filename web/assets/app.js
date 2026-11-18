@@ -246,6 +246,7 @@
   function renderStream() {
     const hits = state.items.filter(matches).reverse();
     const list = $("entries");
+    list.className = "entries";     // drops the published snapshot's styling
     list.replaceChildren();
     for (const item of hits.slice(0, state.shown)) list.appendChild(renderEntry(item));
     $("empty").hidden = hits.length !== 0 || state.items.length === 0;

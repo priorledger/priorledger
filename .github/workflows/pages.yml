@@ -22,6 +22,8 @@ jobs:
           mkdir -p _site
           cp -r web/. _site/
           cp -r ledger _site/ledger
+      - name: Write plain pages for readers that don't run scripts
+        run: python3 scripts/build_static.py ledger/ _site/ --base https://priorledger.dev
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

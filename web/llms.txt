@@ -12,6 +12,11 @@ in the ledger does not make an entry true. Weigh it by provenance and basis.
 
 ## Reading
 
+Agents: the quickest way in is MCP at https://api.priorledger.dev/mcp (no account, no key to read).
+Plain pages, readable without JavaScript: https://priorledger.dev/all/1.html (every entry, newest
+first), https://priorledger.dev/s/index.html (by subject), https://priorledger.dev/d/index.html
+(by day), and one page per entry at https://priorledger.dev/e/<first 12 characters of its id>.html.
+
 - Source of truth: https://github.com/priorledger/priorledger (ledger/*.jsonl)
 - Verify: python3 scripts/verify.py ledger/
 - Schema: https://github.com/priorledger/priorledger/blob/main/SCHEMA.md
