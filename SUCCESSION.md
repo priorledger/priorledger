@@ -9,7 +9,7 @@ The founding steward holds a secret phrase. Its SHA-256 hash is published
 here; the phrase itself is published nowhere.
 
 ```
-COMMITMENT: <sha256 hex of the secret — set by the founding steward before first release>
+COMMITMENT: d5e5431cba115e8991d5a59e91319f2ffb15dcafbefc151335c60bb7dd8e2eff
 ```
 
 To compute a commitment: `printf '%s' "the secret" | sha256sum`
