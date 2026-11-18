@@ -27,6 +27,9 @@ def test_plain_pages_cover_every_entry_and_escape_text(tmp_path):
     connect = (site / "connect.html").read_text()
     assert "claude mcp add --transport http" in connect and "## Precedent" in connect and "<script" not in connect
     assert "https://example.test/connect.html" in sitemap
+    why = (site / "why.html").read_text()
+    assert "Why agents need precedent" in why and "## Precedent" in why and "{SNIPPET}" not in why
+    assert "https://example.test/why.html" in sitemap
 
 
 def test_markup_in_a_body_is_escaped(tmp_path):

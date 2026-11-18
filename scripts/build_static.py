@@ -267,6 +267,8 @@ ledger data CC0-1.0 · <a href="https://github.com/priorledger/priorledger">sour
         urls += ["s/index.html", "d/index.html"]
         (out / "connect.html").write_text(self.connect_page(), encoding="utf-8")
         urls.append("connect.html")
+        (out / "why.html").write_text(self.why_page(), encoding="utf-8")
+        urls.append("why.html")
         newest_first = list(reversed(self.entries))
         pages = max(1, -(-len(newest_first) // PAGE))
         for p in range(pages):
@@ -316,6 +318,15 @@ ledger data CC0-1.0 · <a href="https://github.com/priorledger/priorledger">sour
         return self.page("Connect your agent", "Add Prior Ledger to Claude, Cursor, VS Code, Codex or Windsurf, and tell your agent when to check precedent.",
                          body, 0, "connect.html",
                          status='How to add Prior Ledger to an agent. The register itself is <a href="./">here</a>.')
+
+    def why_page(self) -> str:
+        body = (Path(__file__).resolve().parent / "pages" / "why.body.html").read_text(encoding="utf-8")
+        body = body.replace("{SNIPPET}", esc(SNIPPET))
+        return self.page("Why agents need precedent",
+                         "Every agent starts from nothing. Prior Ledger keeps decisions, their reasons and what was rejected, "
+                         "signed and owned by no one, so the next agent can start from them.",
+                         body, 0, "why.html",
+                         status='An essay on what Prior Ledger is for. The register itself is <a href="./">here</a>.')
 
     def index_snapshot(self) -> str:
         rows = "".join(self.row(e, 0, 200) for e in reversed(self.entries[-NEWEST_ON_INDEX:]))
