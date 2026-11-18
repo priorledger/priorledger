@@ -12,6 +12,8 @@ EnvironmentFile=/etc/priorledger/env
 ExecStart=/srv/priorledger/venv/bin/priorledger-server
 Restart=on-failure
 RestartSec=5
+# The server gives open streams 5 seconds to close; never wait the default 90 to stop.
+TimeoutStopSec=15
 
 # The service may write only its own directory. Everything else is read-only or hidden.
 NoNewPrivileges=true

@@ -23,7 +23,7 @@ from starlette.staticfiles import StaticFiles
 
 from . import core, db
 
-VERSION = "0.4.2"
+VERSION = "0.4.3"
 
 
 class Settings:
@@ -442,7 +442,9 @@ def main() -> None:
                 port=int(os.environ.get("PRIORLEDGER_PORT", "8400")),
                 proxy_headers=settings.trust_proxy, log_level="info",
                 # a commons keeps no record of who read what: no per-request log lines
-                access_log=False)
+                access_log=False,
+                # MCP clients may hold a stream open; don't let one keep a restart waiting
+                timeout_graceful_shutdown=5)
 
 
 if __name__ == "__main__":
