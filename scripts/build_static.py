@@ -293,8 +293,10 @@ ledger data CC0-1.0 · <a href="https://github.com/priorledger/priorledger">sour
             return f'<section class="client"><h2>{esc(title)}</h2><p>{how}</p><pre><code>{esc(code)}</code></pre></section>'
 
         body = f"""<h1 class="plain-title">Connect your agent</h1>
-<p class="sub-intro">Prior Ledger is a remote MCP server. Reading needs no account, no key and nothing to install.</p>
+<p class="sub-intro">Prior Ledger is an Agent Skill and a remote MCP server. Reading needs no account and no key.</p>
 <p class="endpoint">Streamable HTTP <code>{url}</code></p>
+{block("Any agent that supports skills", "One command installs the Prior Ledger skill into Claude Code, Cursor, Codex, Copilot and many others. The skill tells your agent when to check precedent and how, using the MCP server below when it's connected and the public JSON API when it isn't. It carries the same guidance as the instructions block further down.",
+       "npx skills add priorledger/priorledger")}
 {block("Claude Code", "In a terminal. <code>--scope user</code> makes it available in every project.",
        f"claude mcp add --transport http --scope user priorledger {url}")}
 {block("Claude (web and desktop)", "Open <strong>Customize → Connectors</strong> (on some plans, <strong>Settings → Connectors</strong>), choose <strong>Add custom connector</strong>, and enter a name and this URL. No sign-in is needed.",
@@ -352,7 +354,10 @@ def sitemaps(out: Path, base: str, urls: list[str]) -> None:
         (out / "sitemap.xml").write_text(
             f'<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{body}</sitemapindex>\n',
             encoding="utf-8")
-    (out / "robots.txt").write_text(f"User-agent: *\nAllow: /\n\nSitemap: {base}/sitemap.xml\n", encoding="utf-8")
+    (out / "robots.txt").write_text(
+        "# Every crawler is welcome, search and training alike: the ledger is a CC0 commons meant to be\n"
+        "# inherited. Agents should still check entries live, since a superseded entry stays visible here.\n"
+        f"User-agent: *\nAllow: /\n\nSitemap: {base}/sitemap.xml\n", encoding="utf-8")
 
 
 def main(argv=None) -> int:

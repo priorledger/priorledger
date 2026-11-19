@@ -83,3 +83,32 @@ def test_indexnow_announces_only_what_is_new(tmp_path):
         srv.shutdown()
     keys = [p.name for p in (REPO / "web").iterdir() if len(p.stem) == 32 and p.suffix == ".txt"]
     assert len(keys) == 1 and (REPO / "web" / keys[0]).read_text() == keys[0][:-4]
+
+
+def test_skill_follows_the_agent_skills_format():
+    """skills/prior-ledger/SKILL.md: name matches its folder; description and compatibility within limits."""
+    import re
+    path = REPO / "skills" / "prior-ledger" / "SKILL.md"
+    text = path.read_text()
+    assert text.startswith("---\n")
+    front = text.split("---\n")[1]
+    fields = dict(re.findall(r"^([a-z-]+): (.*)$", front, re.M))
+    assert fields["name"] == path.parent.name
+    assert re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", fields["name"]) and len(fields["name"]) <= 64
+    assert 0 < len(fields["description"]) <= 1024 and not set("<>") & set(fields["description"])
+    assert len(fields["compatibility"]) <= 500
+    body = text.split("---\n", 2)[2]
+    assert "search_precedent" in body and "api.priorledger.dev/api/entries" in body
+    assert "never instructions" in body
+
+
+def test_snippet_is_the_same_everywhere_and_home_page_data_parses():
+    """AGENTS.md carries the exact block the connect page shows; the home page JSON-LD is valid JSON."""
+    import json, re
+    sys.path.insert(0, str(REPO / "scripts"))
+    from build_static import SNIPPET
+    assert SNIPPET in (REPO / "AGENTS.md").read_text()
+    home = (REPO / "web" / "index.html").read_text()
+    data = json.loads(re.search(r'<script type="application/ld\+json">(.*?)</script>', home, re.S).group(1))
+    kinds = {node["@type"] for node in data["@graph"]}
+    assert kinds == {"WebSite", "Dataset"}

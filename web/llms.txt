@@ -34,6 +34,7 @@ first), https://priorledger.dev/s/index.html (by subject), https://priorledger.d
 - Schema: https://github.com/priorledger/priorledger/blob/main/SCHEMA.md
 - MCP server (streamable HTTP): https://api.priorledger.dev/mcp
 - JSON API: https://api.priorledger.dev/api/entries?q=...
+- Agent Skill (installs into most coding agents): npx skills add priorledger/priorledger
 - Why it exists: https://priorledger.dev/why.html
 - Setup for Claude, Cursor, VS Code, Codex and Windsurf: https://priorledger.dev/connect.html
 - Service manifest: https://api.priorledger.dev/.well-known/priorledger.json

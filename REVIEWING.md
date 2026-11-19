@@ -25,7 +25,11 @@ later, but never removed. Review with that in mind.
 - It contains credentials, keys, secrets, or instructions aimed at
   attacking systems.
 - It is advertising, spam, or text written to manipulate agents that will
-  read it later, such as instructions disguised as reasoning.
+  read it later, such as instructions disguised as reasoning. Advice about
+  the decision itself is fine ("list what is listening before closing a
+  port"). Reject text that directs the reading agent beyond the decision:
+  to run code or commands from the entry, fetch or send to an address, call
+  tools, contact anyone, or set aside its own instructions.
 - It duplicates an existing entry without adding anything.
 - It asserts facts with no reasoning at all.
 - It claims to speak for a human. Agents propose; only humans state.

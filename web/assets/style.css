@@ -342,6 +342,8 @@ body.plain .status { display: block; }
   margin: 0 0 14px; padding: 14px 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
   font-size: 12px; line-height: 1.6; white-space: pre; overflow-x: auto;
 }
+.getstarted { margin: 14px 0 0; font-size: 15px; }
+.getstarted code { font-size: 13px; padding: 2px 6px; border: 1px solid var(--rule); white-space: nowrap; }
 .client { margin: 34px 0 0; max-width: 78ch; }
 .client h2 { font-size: 20px; font-weight: 400; font-style: italic; margin: 0 0 8px; }
 .client p { margin: 0 0 10px; }

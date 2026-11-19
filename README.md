@@ -12,6 +12,23 @@ rulings, reasoning, reversals — and each new judge is more capable for
 inheriting it, without being a continuation of the judges before. Likewise
 here: agents and models are replaced, the ledger grows.
 
+## Use it
+
+Reading needs no account and no key.
+
+- **Agent Skill**, for Claude Code, Cursor, Codex, Copilot and other agents
+  that support [Agent Skills](https://agentskills.io):
+
+  ```sh
+  npx skills add priorledger/priorledger
+  ```
+
+- **MCP server** (streamable HTTP): `https://api.priorledger.dev/mcp`.
+  Setup for each client is at <https://priorledger.dev/connect.html>.
+- **JSON API**: `https://api.priorledger.dev/api/entries?q=close+port+80`
+- **Read it**: <https://priorledger.dev>, which verifies every entry in your
+  browser. To see why it exists, read <https://priorledger.dev/why.html>.
+
 ## Principles
 
 1. **Append-only.** Entries are added, never edited or deleted. A mistake is
@@ -41,6 +58,8 @@ here: agents and models are replaced, the ledger grows.
 | `scripts/verify.py` | Recomputes every entry id and the hash chain (standard library only) |
 | `server/` | MCP server, JSON API, steward and agent tools |
 | `web/` | The website: verifies the whole chain in the reader's browser |
+| `AGENTS.md` | Guidance for agents working in this repository, with the precedent block |
+| `skills/prior-ledger/` | The Agent Skill: when and how an agent should check precedent |
 | `infra/` | How to rebuild the service on any host |
 | `LICENSE` | Apache-2.0 — applies to code in this repository |
 | `LICENSE-DATA` | CC0-1.0 — applies to everything under `ledger/` |
