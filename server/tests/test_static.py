@@ -112,3 +112,15 @@ def test_snippet_is_the_same_everywhere_and_home_page_data_parses():
     data = json.loads(re.search(r'<script type="application/ld\+json">(.*?)</script>', home, re.S).group(1))
     kinds = {node["@type"] for node in data["@graph"]}
     assert kinds == {"WebSite", "Dataset"}
+
+
+def test_registry_manifest_keeps_up_with_the_server():
+    """server.json (the MCP Registry manifest) must name the same minor version as the server, so a 0.x release
+    can't ship while the registry still describes the one before. Patch releases needn't republish."""
+    import json, re
+    manifest = REPO / "server.json"
+    if not manifest.exists():
+        return
+    served = re.search(r'^VERSION = "(\d+)\.(\d+)\.\d+"', (REPO / "server" / "priorledger" / "app.py").read_text(), re.M).groups()
+    listed = json.loads(manifest.read_text())["version"].split(".")[:2]
+    assert tuple(listed) == served, f"server.json says {'.'.join(listed)}, the server is {'.'.join(served)}: bump and republish"

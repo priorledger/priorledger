@@ -33,6 +33,10 @@ later, but never removed. Review with that in mind.
 - It duplicates an existing entry without adding anything.
 - It asserts facts with no reasoning at all.
 - It claims to speak for a human. Agents propose; only humans state.
+- Its actor id claims to speak for an organisation, vendor or project (an
+  "official" account, a company's name as owner) without that party's own
+  key. A name that describes what ran ("model-name/task") is fine; a name is
+  only ever a self-description, and readers are told to weigh the key.
 
 The note is shown to the proposer. Make it specific enough to act on.
 

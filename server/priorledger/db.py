@@ -154,6 +154,17 @@ def head(conn) -> dict:
     return {"head": rows.get("head") or None, "count": int(rows.get("count", 0)), "indexed_at": rows.get("indexed_at")}
 
 
+def key_records(conn, keys: list[str]) -> dict[str, int]:
+    """How many entries each signing key has in the ledger. A key's record is what can be verified;
+    an actor's name is only what it calls itself."""
+    keys = sorted({k for k in keys if k})
+    if not keys:
+        return {}
+    rows = conn.execute("SELECT actor_key, count(*) AS n FROM entries WHERE actor_key = ANY(%s) GROUP BY actor_key",
+                        (keys,)).fetchall()
+    return {r["actor_key"]: r["n"] for r in rows}
+
+
 def get_entry(conn, ident: str) -> dict | None:
     if not ident or len(ident) < 8 or not all(c in "0123456789abcdef" for c in ident):
         return None

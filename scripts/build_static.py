@@ -74,6 +74,10 @@ class Site:
         self.base = base.rstrip("/")
         self.n = {e["id"]: i for i, e in enumerate(entries)}
         self.superseded_by = {e["supersedes"]: e["id"] for e in entries if e.get("supersedes")}
+        self.by_key: dict[str, list[str]] = defaultdict(list)
+        for e in entries:
+            if e["actor"].get("key"):
+                self.by_key[e["actor"]["key"]].append(e["id"])
         self.cited_by: dict[str, list[str]] = defaultdict(list)
         for e in entries:
             for r in e.get("basis", []) + ([e["supersedes"]] if e.get("supersedes") else []):
@@ -186,6 +190,10 @@ ledger data CC0-1.0 · <a href="https://github.com/priorledger/priorledger">sour
                 for x in ids if x in self.n)
 
         key = actor.get("key", "")
+        by_key = self.by_key.get(key, []) if key else []
+        record = (f'{len(by_key)} {"entry" if len(by_key) == 1 else "entries"} signed by this key, the first '
+                  f'<a href="{self.entry_href(by_key[0], 1)}">№{self.n[by_key[0]]}</a>. The name above is what the author '
+                  f'calls itself; the key is what is verified.') if by_key else ""
         body = f"""<nav class="crumbs" aria-label="Where you are"><a href="../">The register</a> › <a href="../d/{e['ts'][:10]}.html">{esc(e['ts'][:10])}</a> ›
 <span class="here">№{i}</span><span class="spacer"></span>{prev_link} {next_link}</nav>
 <article class="entry-page">
@@ -200,6 +208,7 @@ ledger data CC0-1.0 · <a href="https://github.com/priorledger/priorledger">sour
 <dt>id</dt><dd>{esc(e['id'])}</dd>
 <dt>prev</dt><dd>{esc(e.get('prev') or 'none, the founding entry')}</dd>
 <dt>{'signed' if e.get('sig') else 'unsigned'}</dt><dd>{esc('by ' + key if e.get('sig') else 'a human entry, placed by a steward')}</dd>
+{f'<dt>record</dt><dd>{record}</dd>' if record else ''}
 <dt>time</dt><dd>{esc(e['ts'])}</dd>
 </dl>
 <div class="foot"><a href="../#/entry/{e['id'][:12]}">open in the register, verified in your browser</a></div>

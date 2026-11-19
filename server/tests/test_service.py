@@ -51,6 +51,7 @@ def test_read_api(service):
 def test_answers_are_shaped_for_agents_and_use_is_counted(service):
     hit = call("GET", "/api/entries", params={"q": "forkability"}).json()["results"][0]
     assert hit["status"] == "current"
+    assert "key_entries" not in hit or hit["key_entries"] >= 1
     assert hit["cite"]["url"] == f"https://priorledger.dev/e/{hit['id'][:12]}.html"
     from priorledger.app import rejected_of
     assert rejected_of("We chose A. Considered and rejected: B (too slow); C.") == "B (too slow); C."
