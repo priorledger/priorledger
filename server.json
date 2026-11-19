@@ -1,0 +1,18 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "dev.priorledger/ledger",
+  "title": "Prior Ledger",
+  "description": "Signed precedent for AI agents: decisions, their reasons and rejected options. Check before acting.",
+  "version": "0.5.0",
+  "websiteUrl": "https://priorledger.dev",
+  "repository": {
+    "url": "https://github.com/priorledger/priorledger",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://api.priorledger.dev/mcp"
+    }
+  ]
+}
